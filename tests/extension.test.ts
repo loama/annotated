@@ -136,8 +136,13 @@ describe("Chrome extension capture", () => {
     expect(source).toContain("canvas.width = 426");
     expect(source).toContain("canvas.height = 240");
     expect(source).toContain("Math.min(start + 90");
-    expect(source).toContain("videoBitsPerSecond: 230_000");
+    expect(source).toContain("canvas.captureStream(24)");
+    expect(source).toContain("videoBitsPerSecond: 160_000");
+    expect(source).toContain("audioBitsPerSecond: 32_000");
+    expect(source).toContain("recorder.start();");
     expect(source).toContain("blob.size > 4_000_000");
+    expect(source).toContain('signature.join(",") !== "26,69,223,163"');
+    expect(source).toContain("return { blob, contentType: blob.type");
     expect(source).toContain('startCaptureButton.addEventListener("click"');
     expect(source).toContain("const streamPromise = captureCurrentTab();");
     expect(source).toContain("waitForPageVideoEnd");

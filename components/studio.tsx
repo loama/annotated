@@ -350,16 +350,12 @@ export function Studio() {
           setCaptureSeconds(0);
           setCapturePhase("recording");
         }
-        if (event.data.type === "annotated:video-ready" && typeof event.data.dataUrl === "string") {
-          try {
-            const blob = await (await fetch(event.data.dataUrl)).blob();
-            finish(undefined, {
-              blob,
-              trimStartSeconds: Math.min(5, Math.max(0, Number(event.data.trimStartSeconds) || 0)),
-              durationSeconds: Math.min(90, Math.max(1, Number(event.data.durationSeconds) || clipDuration(draft.startSeconds, draft.endSeconds))),
-            });
-          }
-          catch { finish(new Error("The recorded video could not be prepared for upload.")); }
+        if (event.data.type === "annotated:video-ready" && event.data.blob instanceof Blob) {
+          finish(undefined, {
+            blob: event.data.blob,
+            trimStartSeconds: Math.min(5, Math.max(0, Number(event.data.trimStartSeconds) || 0)),
+            durationSeconds: Math.min(90, Math.max(1, Number(event.data.durationSeconds) || clipDuration(draft.startSeconds, draft.endSeconds))),
+          });
         }
       }
       window.addEventListener("message", receive);

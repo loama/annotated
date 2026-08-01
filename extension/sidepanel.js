@@ -150,7 +150,7 @@ async function recordTabRegion(stream, prepared, duration, startPlayback, waitFo
     }
     draw();
 
-    output = canvas.captureStream(30);
+    output = canvas.captureStream(24);
     stream.getAudioTracks().forEach((track) => output.addTrack(track.clone()));
     if (stream.getAudioTracks().length) {
       audioContext = new AudioContext();
@@ -160,13 +160,13 @@ async function recordTabRegion(stream, prepared, duration, startPlayback, waitFo
     const mimeTypes = ["video/webm;codecs=vp9,opus", "video/webm;codecs=vp8,opus", "video/webm"];
     const mimeType = mimeTypes.find((value) => MediaRecorder.isTypeSupported(value)) || "";
     const chunks = [];
-    recorder = new MediaRecorder(output, { mimeType, videoBitsPerSecond: 230_000, audioBitsPerSecond: 48_000 });
+    recorder = new MediaRecorder(output, { mimeType, videoBitsPerSecond: 160_000, audioBitsPerSecond: 32_000 });
     recorder.ondataavailable = (event) => { if (event.data.size) chunks.push(event.data); };
     const stopped = new Promise((resolve, reject) => {
       recorder.onstop = resolve;
       recorder.onerror = () => reject(new Error("Chrome could not finish the video recording."));
     });
-    recorder.start(1000);
+    recorder.start();
     const recordingStartedAt = performance.now();
     await startPlayback();
     if (signal.aborted) throw new Error("Recording cancelled.");
@@ -184,13 +184,9 @@ async function recordTabRegion(stream, prepared, duration, startPlayback, waitFo
     const blob = new Blob(chunks, { type: recorder.mimeType || "video/webm" });
     if (!blob.size) throw new Error("The captured video was empty.");
     if (blob.size > 4_000_000) throw new Error("The recording was too large to upload. Choose a shorter moment and try again.");
-    const dataUrl = await new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onload = () => resolve(reader.result);
-      reader.onerror = () => reject(new Error("Chrome could not prepare the recorded video."));
-      reader.readAsDataURL(blob);
-    });
-    return { dataUrl, contentType: blob.type, trimStartSeconds, durationSeconds: duration };
+    const signature = new Uint8Array(await blob.slice(0, 4).arrayBuffer());
+    if (signature.join(",") !== "26,69,223,163") throw new Error("Chrome produced an invalid video recording. Try the capture again.");
+    return { blob, contentType: blob.type, trimStartSeconds, durationSeconds: duration };
   } finally {
     drawing = false;
     if (recorder?.state !== "inactive") recorder?.stop();
