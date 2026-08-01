@@ -49,4 +49,4 @@ On macOS, set `YT_DLP_PATH` to a current local `yt-dlp` binary for YouTube clip 
 
 ## Extension
 
-The `extension` directory contains the complete Manifest V3 side-panel extension. Its `APP_ORIGIN` and `frame-src` values point to the production deployment. A ready-to-load archive is published at `/annotated-sidepanel.zip`.
+The `extension` directory contains the complete Manifest V3 side-panel extension. Its `APP_ORIGIN` and `frame-src` values point to the production deployment. The guided installation page is published at `/extension`; its developer-preview archive is available at `/annotated-sidepanel.zip` while the Chrome Web Store listing is pending.

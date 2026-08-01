@@ -7,7 +7,6 @@ import {
   ArrowUpRight,
   Article,
   ChatCircle,
-  DownloadSimple,
   Headphones,
   Heart,
   LinkSimple,
@@ -148,10 +147,10 @@ export function HomeFeed() {
                 <h2 className="mt-7 max-w-[8ch] text-4xl font-medium leading-[0.96] tracking-[-0.065em] md:text-6xl">Save the evidence, not just the link.</h2>
                 <p className="mt-6 max-w-[40ch] text-sm leading-relaxed text-white/52">The Chrome side panel stays beside what you are reading or watching. Select a passage, mark a moment, and write without losing the page.</p>
               </div>
-              <a href="/annotated-sidepanel.zip" download className="pressable group mt-12 flex w-fit items-center gap-3 rounded-full bg-[var(--paper-bright)] py-2 pl-5 pr-2 text-sm font-semibold text-[var(--ink)]">
-                Get the Chrome extension
-                <span className="grid size-9 place-items-center rounded-full bg-[var(--ink)]/7 transition-transform duration-700 ease-[cubic-bezier(0.32,0.72,0,1)] group-hover:translate-y-0.5"><DownloadSimple size={17} weight="light" /></span>
-              </a>
+              <Link href="/extension" className="pressable group mt-12 flex w-fit items-center gap-3 rounded-full bg-[var(--paper-bright)] py-2 pl-5 pr-2 text-sm font-semibold text-[var(--ink)]">
+                Install for Chrome
+                <span className="grid size-9 place-items-center rounded-full bg-[var(--ink)]/7 transition-transform duration-700 ease-[cubic-bezier(0.32,0.72,0,1)] group-hover:translate-x-0.5"><ArrowUpRight size={17} weight="light" /></span>
+              </Link>
             </div>
             <div className="relative min-h-[34rem] overflow-hidden border-t border-white/9 bg-[#171816] p-5 source-pattern lg:border-l lg:border-t-0 md:p-9">
               <div className="absolute -right-24 -top-20 size-80 rounded-full bg-[var(--accent)]/12 blur-3xl" aria-hidden="true" />
@@ -237,7 +236,7 @@ export function HomeFeed() {
           <div className="md:col-span-7"><p className="text-5xl font-medium tracking-[-0.07em] md:text-7xl">Read closely.<br /><span className="text-white/48">Leave a trace.</span></p></div>
           <div className="flex flex-col justify-between gap-12 md:col-span-5 md:items-end">
             <Link href="/studio" className="pressable group flex w-fit items-center gap-3 rounded-full bg-[var(--paper-bright)] py-2 pl-5 pr-2 text-sm font-semibold text-[var(--ink)]">Start annotating <span className="grid size-9 place-items-center rounded-full bg-[var(--ink)]/7"><ArrowUpRight size={17} weight="light" /></span></Link>
-            <div className="flex flex-wrap gap-x-6 gap-y-3 text-xs text-white/48"><span className="flex items-center gap-1.5"><SidebarSimple size={14} weight="light" />Chrome side panel</span><span className="flex items-center gap-1.5"><LinkSimple size={14} weight="light" />Source always attached</span><span>© 2026 Annotated</span></div>
+            <div className="flex flex-wrap gap-x-6 gap-y-3 text-xs text-white/48"><Link href="/extension" className="pressable flex items-center gap-1.5 hover:text-white"><SidebarSimple size={14} weight="light" />Install for Chrome</Link><span className="flex items-center gap-1.5"><LinkSimple size={14} weight="light" />Source always attached</span><Link href="/privacy" className="pressable hover:text-white">Privacy</Link><span>© 2026 Annotated</span></div>
           </div>
         </div>
       </footer>

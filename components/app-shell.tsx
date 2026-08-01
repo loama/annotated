@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { AnimatePresence, motion } from "framer-motion";
-import { ArrowUpRight, DownloadSimple, List, Plus, X } from "@phosphor-icons/react";
+import { ArrowUpRight, List, Plus, SidebarSimple, X } from "@phosphor-icons/react";
 import { usePathname } from "next/navigation";
 import { useState } from "react";
 import { useAuth } from "./auth-provider";
@@ -46,10 +46,10 @@ export function AppShell({ children, compact = false, embedded = false }: { chil
 
           <div className="flex items-center gap-1.5">
             {!compact && (
-              <a href="/annotated-sidepanel.zip" download className="pressable hidden items-center gap-2 rounded-full px-3.5 py-2 text-xs font-medium text-[var(--ink-muted)] hover:text-[var(--ink)] lg:flex">
-                <DownloadSimple size={15} weight="light" />
-                Extension
-              </a>
+              <Link href="/extension" className="pressable hidden items-center gap-2 rounded-full px-3.5 py-2 text-xs font-medium text-[var(--ink-muted)] hover:text-[var(--ink)] lg:flex">
+                <SidebarSimple size={15} weight="light" />
+                Install for Chrome
+              </Link>
             )}
             {!loading && (user ? <button onClick={signOut} className="pressable hidden items-center gap-2 rounded-full border border-[var(--line)] py-1.5 pl-1.5 pr-3 text-xs font-medium sm:flex">{user.picture ? <img src={user.picture} alt="" className="size-6 rounded-full" /> : <span className="grid size-6 place-items-center rounded-full bg-[var(--ink)] text-[0.55rem] text-white">{user.name.slice(0, 1)}</span>}<span className="max-w-24 truncate">{user.name.split(" ")[0]}</span></button> : <button onClick={openSignIn} className="pressable hidden rounded-full border border-[var(--line)] px-3.5 py-2 text-xs font-medium sm:block">Sign in</button>)}
             <Link href="/studio" className="pressable group flex items-center gap-2 rounded-full bg-[var(--accent)] py-2 pl-3.5 pr-1.5 text-xs font-semibold text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.25)]">
@@ -84,7 +84,13 @@ export function AppShell({ children, compact = false, embedded = false }: { chil
                   </Link>
                 </motion.div>
               ))}
-              <motion.button initial={{ opacity: 0, y: 32 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.24, duration: 0.7, ease: [0.32, 0.72, 0, 1] }} onClick={() => { setMenuOpen(false); if (user) void signOut(); else openSignIn(); }} className="flex w-full items-center justify-between border-b border-white/12 py-5 text-left text-4xl font-medium tracking-[-0.06em]">
+              <motion.div initial={{ opacity: 0, y: 32 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.24, duration: 0.7, ease: [0.32, 0.72, 0, 1] }}>
+                <Link href="/extension" onClick={() => setMenuOpen(false)} className="flex items-center justify-between border-b border-white/12 py-5 text-4xl font-medium tracking-[-0.06em]">
+                  Chrome extension
+                  <ArrowUpRight size={23} weight="light" />
+                </Link>
+              </motion.div>
+              <motion.button initial={{ opacity: 0, y: 32 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.32, duration: 0.7, ease: [0.32, 0.72, 0, 1] }} onClick={() => { setMenuOpen(false); if (user) void signOut(); else openSignIn(); }} className="flex w-full items-center justify-between border-b border-white/12 py-5 text-left text-4xl font-medium tracking-[-0.06em]">
                 {user ? "Sign out" : "Sign in"}
                 <ArrowUpRight size={23} weight="light" />
               </motion.button>
