@@ -5,6 +5,7 @@
   "scripts": {
     "dev": "next dev --turbopack",
     "build": "next build",
+    "package:extension": "bun run scripts/package-extension.ts",
     "start": "next start",
     "test": "bun test",
     "typecheck": "tsc --noEmit"
