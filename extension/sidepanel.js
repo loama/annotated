@@ -1,4 +1,4 @@
-const APP_ORIGIN = "https://annotated-one.vercel.app";
+const APP_ORIGIN = "https://annotated-beta.vercel.app";
 const appFrame = document.getElementById("app");
 const loading = document.getElementById("loading");
 const restricted = document.getElementById("restricted");

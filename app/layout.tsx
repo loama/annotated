@@ -8,7 +8,7 @@ const geistMono = Geist_Mono({ subsets: ["latin"], variable: "--font-geist-mono"
 export const metadata: Metadata = {
   title: "Annotated | Keep the moment. Add the meaning.",
   description: "Clip the part that matters from any video, article, or podcast. Add your perspective and keep the original source attached.",
-  metadataBase: new URL(process.env.NEXT_PUBLIC_SITE_URL || "https://annotated-one.vercel.app"),
+  metadataBase: new URL(process.env.NEXT_PUBLIC_SITE_URL || "https://annotated-beta.vercel.app"),
   openGraph: {
     title: "Annotated",
     description: "The source-first public notebook for the web.",
