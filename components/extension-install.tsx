@@ -119,6 +119,18 @@ export function ExtensionInstall({ storeUrl }: { storeUrl?: string }) {
         </div>
       </section>
 
+      {mobileDevice ? (
+        <section id="install-preview" className="mx-auto max-w-[1160px] scroll-mt-28 px-4 pb-28 md:px-7 md:pb-40">
+          <div className="paper-shell">
+            <div className="paper-core p-7 md:p-11">
+              <span className="eyebrow">Desktop handoff</span>
+              <h2 className="mt-6 max-w-[13ch] text-4xl font-medium leading-[0.98] tracking-[-0.06em]">Open this page in Chrome on a desktop to install the extension.</h2>
+              <p className="mt-5 max-w-[52ch] text-sm leading-relaxed text-[var(--ink-muted)]">Chrome for Android and iOS does not support desktop extensions. The web studio remains fully available on this device.</p>
+              <Link href="/studio" className="pressable mt-7 inline-flex items-center gap-2 text-sm font-semibold">Continue in the web studio <ArrowUpRight size={16} weight="light" /></Link>
+            </div>
+          </div>
+        </section>
+      ) : (
       <section id="install-preview" className="mx-auto max-w-[1160px] scroll-mt-28 px-4 pb-28 md:px-7 md:pb-40">
         <div className="grid grid-cols-1 gap-14 md:grid-cols-12 md:gap-8">
           <div className="md:col-span-4">
@@ -156,6 +168,7 @@ export function ExtensionInstall({ storeUrl }: { storeUrl?: string }) {
           </div>
         </div>
       </section>
+      )}
 
       <section className="mx-auto max-w-[1160px] px-4 pb-28 md:px-7 md:pb-40">
         <div className="paper-shell">
