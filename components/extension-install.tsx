@@ -18,18 +18,18 @@ import { AppShell } from "./app-shell";
 const steps = [
   {
     number: "01",
-    title: "Download Annotated",
-    body: "The preview is a tiny extension folder. Chrome needs the whole folder, including its icons, to load it correctly.",
+    title: "Download one clean package",
+    body: "The ZIP contains exactly one folder named “Annotated Extension - SELECT THIS FOLDER.” Nothing else is placed beside it.",
   },
   {
     number: "02",
-    title: "Unzip it once",
-    body: "Open the download and keep the Annotated folder somewhere permanent, such as Applications or Documents.",
+    title: "Open the ZIP",
+    body: "Double-click the download once. Keep the extracted folder somewhere permanent, such as Documents.",
   },
   {
     number: "03",
-    title: "Load it in Chrome",
-    body: "Open Chrome Extensions, enable Developer mode, choose Load unpacked, and select the Annotated folder.",
+    title: "Select the folder, not a file",
+    body: "Open Chrome Extensions, enable Developer mode, and choose Load unpacked. Select the entire folder named “Annotated Extension - SELECT THIS FOLDER.” The files inside may look greyed out because Chrome accepts the folder itself. Click Select.",
   },
 ];
 
@@ -144,8 +144,8 @@ export function ExtensionInstall({ storeUrl, mobileDevice }: { storeUrl?: string
                     <p className="mt-2 max-w-[52ch] text-sm leading-relaxed text-[var(--ink-muted)]">{step.body}</p>
                   </div>
                   {step.number === "01" && (
-                    <a href="/annotated-sidepanel.zip" download className="pressable col-start-2 mt-3 flex w-fit items-center gap-2 rounded-full bg-[var(--ink)] px-4 py-3 text-xs font-semibold text-white md:col-start-auto md:mt-0">
-                      <DownloadSimple size={15} weight="light" />Download preview
+                    <a href="/annotated-chrome-extension-v1.0.1.zip" download className="pressable col-start-2 mt-3 flex w-fit items-center gap-2 rounded-full bg-[var(--ink)] px-4 py-3 text-xs font-semibold text-white md:col-start-auto md:mt-0">
+                      <DownloadSimple size={15} weight="light" />Download install folder
                     </a>
                   )}
                   {step.number === "03" && (
