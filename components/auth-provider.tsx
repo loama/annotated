@@ -19,11 +19,33 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [signInOpen, setSignInOpen] = useState(false);
 
   useEffect(() => {
-    fetch("/api/auth/session", { cache: "no-store" })
-      .then((response) => response.ok ? response.json() : Promise.reject(new Error("Session unavailable")))
-      .then((payload: { user: SessionUser | null }) => setUser(payload.user))
-      .catch(() => setUser(null))
-      .finally(() => setLoading(false));
+    let active = true;
+
+    async function refreshSession() {
+      try {
+        const response = await fetch("/api/auth/session", { cache: "no-store", credentials: "include" });
+        if (!response.ok) throw new Error("Session unavailable");
+        const payload = await response.json() as { user: SessionUser | null };
+        if (active) setUser(payload.user);
+      } catch {
+        if (active) setUser(null);
+      } finally {
+        if (active) setLoading(false);
+      }
+    }
+
+    function refreshVisibleSession() {
+      if (document.visibilityState === "visible") void refreshSession();
+    }
+
+    void refreshSession();
+    window.addEventListener("focus", refreshVisibleSession);
+    document.addEventListener("visibilitychange", refreshVisibleSession);
+    return () => {
+      active = false;
+      window.removeEventListener("focus", refreshVisibleSession);
+      document.removeEventListener("visibilitychange", refreshVisibleSession);
+    };
   }, []);
 
   const value = useMemo<AuthContextValue>(() => ({

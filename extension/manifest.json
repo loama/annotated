@@ -1,10 +1,11 @@
 {
   "manifest_version": 3,
   "name": "Annotated",
-  "version": "1.0.2",
+  "version": "1.0.3",
   "description": "Clip the exact part that matters, add your perspective, and keep the original source attached.",
   "minimum_chrome_version": "116",
   "permissions": ["activeTab", "scripting", "sidePanel", "storage"],
+  "host_permissions": ["https://annotated-beta.vercel.app/*"],
   "action": {
     "default_title": "Open Annotated",
     "default_icon": {

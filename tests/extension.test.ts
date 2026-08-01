@@ -38,7 +38,7 @@ async function loadBackground(options?: { scriptResult?: Record<string, unknown>
 
 describe("Chrome extension capture", () => {
   test("packages one unmistakable folder that Chrome can load unpacked", async () => {
-    const archivePath = fileURLToPath(new URL("../public/annotated-chrome-extension-v1.0.2.zip", import.meta.url));
+    const archivePath = fileURLToPath(new URL("../public/annotated-chrome-extension-v1.0.3.zip", import.meta.url));
     const listingProcess = Bun.spawnSync(["/usr/bin/unzip", "-Z1", archivePath]);
     expect(listingProcess.exitCode).toBe(0);
 
@@ -56,7 +56,7 @@ describe("Chrome extension capture", () => {
       const manifestPath = join(extractionRoot, installRoot, "manifest.json");
       const manifest = await Bun.file(manifestPath).json();
       expect(manifest.manifest_version).toBe(3);
-      expect(manifest.version).toBe("1.0.2");
+      expect(manifest.version).toBe("1.0.3");
       const installGuide = await Bun.file(join(extractionRoot, installRoot, "INSTALL.txt")).text();
       expect(installGuide).toContain("Command + 2");
       expect(installGuide).toContain("List view enables Select");
@@ -111,7 +111,14 @@ describe("Chrome extension capture", () => {
   test("declares only the permissions used by the capture flow", async () => {
     const manifest = await Bun.file(new URL("../extension/manifest.json", import.meta.url)).json();
     expect(manifest.permissions).toEqual(["activeTab", "scripting", "sidePanel", "storage"]);
-    expect(manifest.host_permissions).toBeUndefined();
+    expect(manifest.host_permissions).toEqual(["https://annotated-beta.vercel.app/*"]);
+    expect(manifest.host_permissions).not.toContain("<all_urls>");
+    expect(manifest.host_permissions.every((permission: string) => !permission.includes("*://"))).toBe(true);
+  });
+
+  test("delegates microphone access to the embedded studio", async () => {
+    const html = await Bun.file(new URL("../extension/sidepanel.html", import.meta.url)).text();
+    expect(html).toMatch(/<iframe[^>]+id="app"[^>]+allow="microphone"/);
   });
 
   test("reveals a frame that becomes ready before its capture arrives", async () => {

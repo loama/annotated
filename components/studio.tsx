@@ -27,6 +27,7 @@ import { useAuth } from "./auth-provider";
 import { sessionAuthor } from "@/lib/identity";
 import { clampClip, clipDuration, detectSourceType, makeAnnotationId, sourceDomain, VIDEO_RESOLUTION, youtubeId } from "@/lib/rules";
 import { encodeAnnotation } from "@/lib/encoding";
+import { microphoneFailure, microphoneIsDelegated, type MicrophoneFailure } from "@/lib/microphone";
 import type { Annotation, SourceType, StudioDraft } from "@/lib/types";
 
 const steps = ["Source", "Select", "Comment", "Review"];
@@ -122,6 +123,7 @@ export function Studio() {
   const fromExtension = searchParams.get("extension") === "1";
   const extensionOrigin = searchParams.get("extensionOrigin") || "";
   const initialUrl = searchParams.get("source") || "";
+  const resumeKey = searchParams.get("resume") || "";
   const initialType = (searchParams.get("type") as SourceType | null) || (initialUrl ? detectSourceType(initialUrl) : "video");
   const initialClip = clampClip(Number(searchParams.get("start")) || 0, Number(searchParams.get("end")) || 60);
   const [step, setStep] = useState(initialUrl ? 1 : 0);
@@ -142,6 +144,7 @@ export function Studio() {
   const [commentMode, setCommentMode] = useState<"text" | "audio">("text");
   const [recording, setRecording] = useState(false);
   const [requestingMicrophone, setRequestingMicrophone] = useState(false);
+  const [microphoneError, setMicrophoneError] = useState<MicrophoneFailure | null>(null);
   const [recordedUrl, setRecordedUrl] = useState<string | null>(null);
   const [recordedBlob, setRecordedBlob] = useState<Blob | null>(null);
   const [recordingSeconds, setRecordingSeconds] = useState(0);
@@ -157,6 +160,25 @@ export function Studio() {
   }, [recording]);
 
   useEffect(() => () => { if (recordedUrl) URL.revokeObjectURL(recordedUrl); }, [recordedUrl]);
+
+  useEffect(() => {
+    if (!resumeKey) return;
+    const storageKey = `annotated:studio-resume:${resumeKey}`;
+    try {
+      const stored = window.localStorage.getItem(storageKey);
+      window.localStorage.removeItem(storageKey);
+      if (!stored) return;
+      const payload = JSON.parse(stored) as { draft?: StudioDraft; savedAt?: number };
+      if (!payload.draft?.sourceUrl || !payload.savedAt || Date.now() - payload.savedAt > 10 * 60 * 1000) return;
+      const source = new URL(payload.draft.sourceUrl);
+      if (!/^https?:$/.test(source.protocol)) return;
+      setDraft(payload.draft);
+      setCommentMode("audio");
+      setStep(2);
+    } catch {
+      window.localStorage.removeItem(storageKey);
+    }
+  }, [resumeKey]);
 
   useEffect(() => {
     if (!fromExtension || !/^chrome-extension:\/\/[a-p]{32}$/.test(extensionOrigin)) return;
@@ -249,8 +271,10 @@ export function Studio() {
       return;
     }
     setRequestingMicrophone(true);
-    setSourceError("");
+    setMicrophoneError(null);
     try {
+      if (!navigator.mediaDevices?.getUserMedia) throw new Error("UnsupportedError");
+      if (!microphoneIsDelegated(document)) throw new DOMException("Microphone permission was not delegated", "SecurityError");
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       chunks.current = [];
       const recorder = new MediaRecorder(stream);
@@ -265,9 +289,15 @@ export function Studio() {
       mediaRecorder.current = recorder;
       setRecordingSeconds(0);
       setRecording(true);
-    } catch {
-      setSourceError("Microphone access is needed to record audio commentary.");
+    } catch (reason) {
+      setMicrophoneError(microphoneFailure(reason));
     } finally { setRequestingMicrophone(false); }
+  }
+
+  function openRecorderInTab() {
+    const key = crypto.randomUUID();
+    window.localStorage.setItem(`annotated:studio-resume:${key}`, JSON.stringify({ draft, savedAt: Date.now() }));
+    window.open(`/studio?resume=${encodeURIComponent(key)}`, "_blank", "noopener,noreferrer");
   }
 
   async function publish() {
@@ -429,9 +459,15 @@ export function Studio() {
                           <p className="mt-6 text-lg font-medium tracking-[-0.04em]">{requestingMicrophone ? "Allow microphone access" : recording ? "Recording your thought" : recordedUrl ? "Your voice note is ready" : "Record audio commentary"}</p>
                           <p className="mt-2 font-mono text-[0.62rem] text-[var(--ink-muted)]">{requestingMicrophone ? "Use the browser prompt to continue" : recording ? `${formatTime(recordingSeconds)} · tap to finish` : "Your recording is uploaded only when you publish"}</p>
                           {recordedUrl && !recording && <audio controls src={recordedUrl} className="mt-6 w-full max-w-sm" />}
+                          {microphoneError && (
+                            <div role="alert" className="mt-6 max-w-md rounded-xl bg-[var(--accent)]/8 px-4 py-3 text-left text-xs leading-relaxed text-[var(--accent)]">
+                              <p className="font-semibold">{microphoneError.message}</p>
+                              <p className="mt-1">{fromExtension && (microphoneError.kind === "blocked" || microphoneError.kind === "panel") ? "Continue in a full Annotated tab, where Chrome can show the correct site controls." : microphoneError.action}</p>
+                              {fromExtension && (microphoneError.kind === "blocked" || microphoneError.kind === "panel") && <button type="button" onClick={openRecorderInTab} className="pressable mt-3 rounded-full bg-[var(--accent)] px-4 py-2 font-semibold text-white">Open recorder in a tab</button>}
+                            </div>
+                          )}
                         </div>
                       )}
-                      {sourceError && <p className="mt-3 flex items-center gap-2 text-xs text-[var(--accent)]"><WarningCircle size={14} weight="light" />{sourceError}</p>}
                     </>
                   )}
 

@@ -7,7 +7,7 @@ const projectRoot = fileURLToPath(new URL("../", import.meta.url));
 const sourceDirectory = join(projectRoot, "extension");
 const publicDirectory = join(projectRoot, "public");
 const installFolderName = "Annotated Extension - SELECT THIS FOLDER";
-const versionedArchive = join(publicDirectory, "annotated-chrome-extension-v1.0.2.zip");
+const versionedArchive = join(publicDirectory, "annotated-chrome-extension-v1.0.3.zip");
 const legacyArchive = join(publicDirectory, "annotated-sidepanel.zip");
 const stagingRoot = await mkdtemp(join(tmpdir(), "annotated-extension-"));
 const installDirectory = join(stagingRoot, installFolderName);
@@ -21,13 +21,15 @@ Do not select manifest.json, an icon, or any other individual file.
 
 1. Open chrome://extensions in Google Chrome.
 2. Turn on Developer mode.
-3. Click Load unpacked.
-4. On macOS, press Command + 2 in the folder dialog to switch to List view.
+3. If an older Annotated version is installed, remove it first so its toolbar
+   icon cannot be confused with this update.
+4. Click Load unpacked.
+5. On macOS, press Command + 2 in the folder dialog to switch to List view.
    Chrome's default Column view can show every file greyed out and disable
    Select. List view enables Select for the extension folder.
-5. Select the folder named:
+6. Select the folder named:
    Annotated Extension - SELECT THIS FOLDER
-6. Click Select.
+7. Click Select.
 
 After installation, pin Annotated and click its toolbar icon on an article,
 YouTube video, or podcast.
