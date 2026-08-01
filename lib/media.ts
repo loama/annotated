@@ -103,6 +103,8 @@ export async function processYouTubeClip(url: string, start: number, duration: n
     await run(ytDlpPath, [
       "--no-playlist",
       "--no-progress",
+      "--js-runtimes", "node",
+      "--extractor-args", "youtube:player_client=web_embedded",
       "--download-sections", `*${start}-${start + duration}`,
       "--force-keyframes-at-cuts",
       "--format", "bestvideo[height<=240][ext=mp4]+bestaudio[ext=m4a]/best[height<=240][ext=mp4]",
