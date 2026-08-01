@@ -1,0 +1,79 @@
+import { list, put } from "@vercel/blob";
+import { NextRequest, NextResponse } from "next/server";
+import { seedAnnotations } from "@/lib/data";
+import { MAX_CLIP_SECONDS, VIDEO_RESOLUTION } from "@/lib/rules";
+import type { Annotation } from "@/lib/types";
+
+export const dynamic = "force-dynamic";
+
+function token() {
+  return process.env.BLOB_READ_WRITE_TOKEN;
+}
+
+function validAnnotation(value: unknown): value is Annotation {
+  if (!value || typeof value !== "object") return false;
+  const annotation = value as Annotation;
+  if (!annotation.id || !annotation.sourceUrl || !annotation.sourceTitle || !annotation.commentary || !annotation.author?.id) return false;
+  try { new URL(annotation.sourceUrl); } catch { return false; }
+  if (annotation.sourceType === "video") {
+    if (annotation.resolution !== VIDEO_RESOLUTION) return false;
+    if (typeof annotation.startSeconds !== "number" || typeof annotation.endSeconds !== "number") return false;
+    if (annotation.endSeconds - annotation.startSeconds > MAX_CLIP_SECONDS || annotation.endSeconds <= annotation.startSeconds) return false;
+  }
+  if (annotation.sourceType === "podcast") {
+    if (typeof annotation.startSeconds !== "number" || typeof annotation.endSeconds !== "number") return false;
+    if (annotation.endSeconds - annotation.startSeconds > MAX_CLIP_SECONDS || annotation.endSeconds <= annotation.startSeconds) return false;
+  }
+  if (annotation.sourceType === "article" && (!annotation.excerpt || annotation.excerpt.trim().length < 12)) return false;
+  return true;
+}
+
+async function dynamicAnnotations() {
+  const blobToken = token();
+  if (!blobToken) return [];
+  const result = await list({ prefix: "annotations/", limit: 80, token: blobToken });
+  const annotations = await Promise.all(result.blobs.map(async (blob) => {
+    try {
+      const response = await fetch(blob.url, { cache: "no-store" });
+      return response.ok ? await response.json() as Annotation : null;
+    } catch { return null; }
+  }));
+  return annotations.filter((annotation): annotation is Annotation => Boolean(annotation));
+}
+
+export async function GET(request: NextRequest) {
+  const id = request.nextUrl.searchParams.get("id");
+  const seeded = id ? seedAnnotations.find((annotation) => annotation.id === id) : null;
+  if (seeded) return NextResponse.json({ annotation: seeded });
+  try {
+    const dynamic = await dynamicAnnotations();
+    if (id) {
+      const annotation = dynamic.find((item) => item.id === id);
+      if (!annotation) return NextResponse.json({ error: "Annotation not found" }, { status: 404 });
+      return NextResponse.json({ annotation });
+    }
+    const annotations = [...dynamic, ...seedAnnotations].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+    return NextResponse.json({ annotations });
+  } catch {
+    if (id) return NextResponse.json({ error: "Annotation not found" }, { status: 404 });
+    return NextResponse.json({ annotations: seedAnnotations, degraded: true });
+  }
+}
+
+export async function POST(request: NextRequest) {
+  let payload: unknown;
+  try { payload = await request.json(); }
+  catch { return NextResponse.json({ error: "Invalid JSON" }, { status: 400 }); }
+  if (!validAnnotation(payload)) return NextResponse.json({ error: "Annotation does not meet the publishing rules" }, { status: 422 });
+
+  const blobToken = token();
+  if (!blobToken) return NextResponse.json({ annotation: payload, persisted: false }, { status: 201 });
+  await put(`annotations/${payload.id}.json`, JSON.stringify(payload), {
+    access: "public",
+    addRandomSuffix: false,
+    allowOverwrite: true,
+    contentType: "application/json",
+    token: blobToken,
+  });
+  return NextResponse.json({ annotation: payload, persisted: true }, { status: 201 });
+}
