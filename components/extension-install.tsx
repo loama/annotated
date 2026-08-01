@@ -12,7 +12,7 @@ import {
   SidebarSimple,
   Sparkle,
 } from "@phosphor-icons/react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { AppShell } from "./app-shell";
 
 const steps = [
@@ -34,12 +34,22 @@ const steps = [
 ];
 
 export function ExtensionInstall({ storeUrl }: { storeUrl?: string }) {
-  const [copied, setCopied] = useState(false);
+  const [copyState, setCopyState] = useState<"idle" | "copied" | "failed">("idle");
+  const [mobileDevice, setMobileDevice] = useState(false);
+
+  useEffect(() => {
+    setMobileDevice(/Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent));
+  }, []);
 
   async function copyExtensionsAddress() {
-    await navigator.clipboard.writeText("chrome://extensions");
-    setCopied(true);
-    window.setTimeout(() => setCopied(false), 1800);
+    try {
+      if (!navigator.clipboard) throw new Error("Clipboard unavailable");
+      await navigator.clipboard.writeText("chrome://extensions");
+      setCopyState("copied");
+      window.setTimeout(() => setCopyState("idle"), 1800);
+    } catch {
+      setCopyState("failed");
+    }
   }
 
   return (
@@ -51,7 +61,12 @@ export function ExtensionInstall({ storeUrl }: { storeUrl?: string }) {
         </div>
         <div className="flex flex-col items-start md:col-span-5 md:pb-2">
           <p className="max-w-[42ch] text-base leading-relaxed text-[var(--ink-muted)]">Open Annotated in Chrome&apos;s native side panel. The page stays visible while you select a passage, mark a moment, and add your response.</p>
-          {storeUrl ? (
+          {mobileDevice ? (
+            <Link href="/studio" className="pressable group mt-8 flex items-center gap-3 rounded-full bg-[var(--ink)] py-2 pl-5 pr-2 text-sm font-semibold text-white">
+              Use the web studio
+              <span className="grid size-9 place-items-center rounded-full bg-white/9 transition-transform duration-700 ease-[cubic-bezier(0.32,0.72,0,1)] group-hover:translate-x-0.5"><ArrowUpRight size={17} weight="light" /></span>
+            </Link>
+          ) : storeUrl ? (
             <a href={storeUrl} target="_blank" rel="noreferrer" className="pressable group mt-8 flex items-center gap-3 rounded-full bg-[var(--accent)] py-2 pl-5 pr-2 text-sm font-semibold text-white">
               Add to Chrome
               <span className="grid size-9 place-items-center rounded-full bg-white/14 transition-transform duration-700 ease-[cubic-bezier(0.32,0.72,0,1)] group-hover:translate-x-0.5"><ArrowUpRight size={17} weight="light" /></span>
@@ -62,7 +77,7 @@ export function ExtensionInstall({ storeUrl }: { storeUrl?: string }) {
               <span className="grid size-9 place-items-center rounded-full bg-white/14 transition-transform duration-700 ease-[cubic-bezier(0.32,0.72,0,1)] group-hover:translate-y-0.5"><ArrowRight size={17} weight="light" /></span>
             </a>
           )}
-          <p className="mt-4 font-mono text-[0.58rem] uppercase tracking-[0.12em] text-[var(--ink-muted)]">Chrome 116+ · Native side panel · 18 KB</p>
+          <p className="mt-4 font-mono text-[0.58rem] uppercase tracking-[0.12em] text-[var(--ink-muted)]">{mobileDevice ? "The extension requires Chrome on desktop" : "Chrome 116+ on desktop · Native side panel · 18 KB"}</p>
         </div>
       </section>
 
@@ -109,7 +124,7 @@ export function ExtensionInstall({ storeUrl }: { storeUrl?: string }) {
           <div className="md:col-span-4">
             <span className="eyebrow">Developer preview</span>
             <h2 className="mt-7 max-w-[9ch] text-4xl font-medium leading-[0.98] tracking-[-0.06em] md:text-5xl">Installed in three small steps.</h2>
-            <p className="mt-6 max-w-[36ch] text-sm leading-relaxed text-[var(--ink-muted)]">Chrome only permits one-click installs through the Chrome Web Store. Until the listing is approved, this guided preview is the secure installation path.</p>
+            <p className="mt-6 max-w-[36ch] text-sm leading-relaxed text-[var(--ink-muted)]">Chrome only permits one-click installs through the Chrome Web Store. Until the listing is approved, this page provides a clearly labeled manual preview installation.</p>
           </div>
 
           <div className="md:col-span-8">
@@ -127,9 +142,13 @@ export function ExtensionInstall({ storeUrl }: { storeUrl?: string }) {
                     </a>
                   )}
                   {step.number === "03" && (
-                    <button type="button" onClick={copyExtensionsAddress} className="pressable col-start-2 mt-3 flex w-fit items-center gap-2 rounded-full border border-[var(--line)] px-4 py-3 text-xs font-semibold md:col-start-auto md:mt-0">
-                      {copied ? <Check size={15} weight="bold" /> : <Copy size={15} weight="light" />}{copied ? "Copied" : "Copy address"}
-                    </button>
+                    <div className="col-start-2 mt-3 flex flex-col items-start gap-2 md:col-start-auto md:mt-0 md:items-end">
+                      <button type="button" onClick={copyExtensionsAddress} className="pressable flex w-fit items-center gap-2 rounded-full border border-[var(--line)] px-4 py-3 text-xs font-semibold">
+                        {copyState === "copied" ? <Check size={15} weight="bold" /> : <Copy size={15} weight="light" />}{copyState === "copied" ? "Copied" : "Copy address"}
+                      </button>
+                      {copyState === "failed" && <code className="rounded-md bg-[var(--paper-deep)] px-2 py-1 font-mono text-[0.62rem]">chrome://extensions</code>}
+                      <span className="sr-only" aria-live="polite">{copyState === "copied" ? "Chrome Extensions address copied." : copyState === "failed" ? "Copy failed. Select the Chrome Extensions address shown below." : ""}</span>
+                    </div>
                   )}
                 </div>
               ))}
