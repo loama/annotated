@@ -38,7 +38,7 @@ async function loadBackground(options?: { scriptResult?: Record<string, unknown>
 
 describe("Chrome extension capture", () => {
   test("packages one unmistakable folder that Chrome can load unpacked", async () => {
-    const archivePath = fileURLToPath(new URL("../public/annotated-chrome-extension-v1.0.1.zip", import.meta.url));
+    const archivePath = fileURLToPath(new URL("../public/annotated-chrome-extension-v1.0.2.zip", import.meta.url));
     const listingProcess = Bun.spawnSync(["/usr/bin/unzip", "-Z1", archivePath]);
     expect(listingProcess.exitCode).toBe(0);
 
@@ -56,6 +56,10 @@ describe("Chrome extension capture", () => {
       const manifestPath = join(extractionRoot, installRoot, "manifest.json");
       const manifest = await Bun.file(manifestPath).json();
       expect(manifest.manifest_version).toBe(3);
+      expect(manifest.version).toBe("1.0.2");
+      const installGuide = await Bun.file(join(extractionRoot, installRoot, "INSTALL.txt")).text();
+      expect(installGuide).toContain("Command + 2");
+      expect(installGuide).toContain("List view enables Select");
 
       const referencedFiles = [
         manifest.background.service_worker,

@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Annotated",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "description": "Clip the exact part that matters, add your perspective, and keep the original source attached.",
   "minimum_chrome_version": "116",
   "permissions": ["activeTab", "scripting", "sidePanel", "storage"],
