@@ -53,6 +53,7 @@ async function readCurrentPage() {
       end: String((page.mediaCurrentTime || 0) + 60),
     });
     if (page.selection) params.set("selection", page.selection);
+    if (page.audioSrc && !page.audioSrc.startsWith("blob:")) params.set("media", page.audioSrc);
     appFrame.src = `${APP_ORIGIN}/studio?${params.toString()}`;
     appFrame.onload = () => {
       loading.hidden = true;

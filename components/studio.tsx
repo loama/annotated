@@ -23,7 +23,8 @@ import {
 import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { AppShell } from "./app-shell";
-import { authors } from "@/lib/data";
+import { useAuth } from "./auth-provider";
+import { sessionAuthor } from "@/lib/identity";
 import { clampClip, clipDuration, detectSourceType, makeAnnotationId, sourceDomain, VIDEO_RESOLUTION, youtubeId } from "@/lib/rules";
 import { encodeAnnotation } from "@/lib/encoding";
 import type { Annotation, SourceType, StudioDraft } from "@/lib/types";
@@ -70,7 +71,7 @@ function StudioPreview({ draft }: { draft: StudioDraft }) {
         <div className="relative flex flex-1 flex-col justify-center py-9">
           {draft.sourceType === "video" && (
             <div className="relative aspect-video overflow-hidden rounded-[1.4rem] bg-black/35">
-              {video ? <img src={`https://i.ytimg.com/vi/${video}/hqdefault.jpg`} alt="Video source preview" className="size-full object-cover opacity-72" /> : <div className="grid size-full place-items-center"><Play size={30} weight="light" className="text-white/28" /></div>}
+              {draft.mediaUrl.startsWith("/api/media") ? <video controls src={draft.mediaUrl} className="size-full object-contain" /> : video ? <img src={`https://i.ytimg.com/vi/${video}/hqdefault.jpg`} alt="Video source preview" className="size-full object-cover opacity-72" /> : <div className="grid size-full place-items-center"><Play size={30} weight="light" className="text-white/28" /></div>}
               <div className="absolute inset-0 bg-gradient-to-t from-black/65 to-transparent" />
               <span className="absolute left-1/2 top-1/2 grid size-12 -translate-x-1/2 -translate-y-1/2 place-items-center rounded-full bg-[var(--accent)]"><Play size={17} weight="fill" /></span>
               <div className="absolute inset-x-4 bottom-4 flex items-center justify-between font-mono text-[0.58rem]"><span>{formatTime(draft.startSeconds)} to {formatTime(draft.endSeconds)}</span><span>{clipDuration(draft.startSeconds, draft.endSeconds)}s</span></div>
@@ -89,6 +90,7 @@ function StudioPreview({ draft }: { draft: StudioDraft }) {
                 {Array.from({ length: 54 }, (_, index) => <span key={index} className="wave-bar w-[2px] rounded-full bg-[var(--accent)]" style={{ height: `${18 + ((index * 29) % 78)}%`, animationDelay: `${index * -42}ms` }} />)}
               </div>
               <div className="mt-6 flex items-center justify-between text-xs"><span>{formatTime(draft.startSeconds)} to {formatTime(draft.endSeconds)}</span><span className="text-white/44">{clipDuration(draft.startSeconds, draft.endSeconds)} seconds</span></div>
+              {draft.mediaUrl.startsWith("/api/media") && <audio controls src={draft.mediaUrl} className="mt-5 w-full" />}
             </div>
           )}
         </div>
@@ -105,6 +107,7 @@ function StudioPreview({ draft }: { draft: StudioDraft }) {
 export function Studio() {
   const searchParams = useSearchParams();
   const router = useRouter();
+  const { user, openSignIn } = useAuth();
   const fromExtension = searchParams.get("extension") === "1";
   const initialUrl = searchParams.get("source") || "";
   const initialType = (searchParams.get("type") as SourceType | null) || (initialUrl ? detectSourceType(initialUrl) : "video");
@@ -113,7 +116,10 @@ export function Studio() {
   const [draft, setDraft] = useState<StudioDraft>({
     sourceUrl: initialUrl,
     sourceTitle: searchParams.get("title") || "",
+    sourcePublisher: sourceDomain(initialUrl),
+    sourceImage: "",
     sourceType: initialType,
+    mediaUrl: searchParams.get("media") || "",
     selection: searchParams.get("selection") || "",
     startSeconds: initialClip.startSeconds,
     endSeconds: initialClip.endSeconds,
@@ -124,8 +130,10 @@ export function Studio() {
   const [commentMode, setCommentMode] = useState<"text" | "audio">("text");
   const [recording, setRecording] = useState(false);
   const [recordedUrl, setRecordedUrl] = useState<string | null>(null);
+  const [recordedBlob, setRecordedBlob] = useState<Blob | null>(null);
   const [recordingSeconds, setRecordingSeconds] = useState(0);
   const [publishing, setPublishing] = useState(false);
+  const [publishError, setPublishError] = useState("");
   const mediaRecorder = useRef<MediaRecorder | null>(null);
   const chunks = useRef<Blob[]>([]);
 
@@ -140,12 +148,14 @@ export function Studio() {
   const canContinue = useMemo(() => {
     if (step === 0) return Boolean(draft.sourceUrl && !sourceError);
     if (step === 1) return draft.sourceType !== "article" || draft.selection.trim().length >= 12;
-    if (step === 2) return draft.commentary.trim().length >= 12 || Boolean(recordedUrl);
+    if (step === 2) return draft.commentary.trim().length >= 12 || Boolean(recordedBlob);
     return true;
-  }, [draft, recordedUrl, sourceError, step]);
+  }, [draft, recordedBlob, sourceError, step]);
 
   function updateUrl(value: string) {
-    setDraft((current) => ({ ...current, sourceUrl: value, sourceType: detectSourceType(value) }));
+    setDraft((current) => ({ ...current, sourceUrl: value, sourceType: detectSourceType(value), sourceTitle: "", sourcePublisher: sourceDomain(value), sourceImage: "", mediaUrl: "", selection: "", commentary: "" }));
+    setRecordedBlob(null);
+    if (recordedUrl) { URL.revokeObjectURL(recordedUrl); setRecordedUrl(null); }
     if (!value) setSourceError("");
     else {
       try { new URL(value); setSourceError(""); }
@@ -153,17 +163,19 @@ export function Studio() {
     }
   }
 
-  function analyzeSource() {
+  async function analyzeSource() {
     if (!canContinue) return;
     setAnalyzing(true);
-    window.setTimeout(() => {
-      setDraft((current) => ({
-        ...current,
-        sourceTitle: current.sourceTitle || (current.sourceType === "video" ? "Video excerpt" : current.sourceType === "podcast" ? "Podcast episode" : "Selected article"),
-      }));
-      setAnalyzing(false);
+    setSourceError("");
+    try {
+      const response = await fetch("/api/source", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ url: draft.sourceUrl, type: draft.sourceType }) });
+      const payload = await response.json() as { title?: string; publisher?: string; image?: string; selection?: string; mediaUrl?: string; error?: string };
+      if (!response.ok) throw new Error(payload.error || "Source analysis failed");
+      setDraft((current) => ({ ...current, sourceTitle: payload.title || "Untitled source", sourcePublisher: payload.publisher || sourceDomain(current.sourceUrl), sourceImage: payload.image || "", selection: current.selection || payload.selection || "", mediaUrl: current.mediaUrl || payload.mediaUrl || "" }));
       setStep(1);
-    }, 780);
+    } catch (reason) {
+      setSourceError(reason instanceof Error ? reason.message : "Source analysis failed");
+    } finally { setAnalyzing(false); }
   }
 
   function setClip(key: "startSeconds" | "endSeconds", value: number) {
@@ -187,6 +199,7 @@ export function Studio() {
       recorder.ondataavailable = (event) => event.data.size && chunks.current.push(event.data);
       recorder.onstop = () => {
         const blob = new Blob(chunks.current, { type: recorder.mimeType || "audio/webm" });
+        setRecordedBlob(blob);
         setRecordedUrl(URL.createObjectURL(blob));
         stream.getTracks().forEach((track) => track.stop());
       };
@@ -200,35 +213,64 @@ export function Studio() {
   }
 
   async function publish() {
+    if (!user) { openSignIn(); return; }
     setPublishing(true);
-    const id = makeAnnotationId(draft.sourceTitle);
-    const annotation: Annotation = {
-      id,
-      sourceType: draft.sourceType,
-      sourceUrl: draft.sourceUrl,
-      sourceDomain: sourceDomain(draft.sourceUrl),
-      sourceTitle: draft.sourceTitle || "Untitled source",
-      sourcePublisher: sourceDomain(draft.sourceUrl),
-      excerpt: draft.sourceType === "article" ? draft.selection : undefined,
-      startSeconds: draft.sourceType !== "article" ? draft.startSeconds : undefined,
-      endSeconds: draft.sourceType !== "article" ? draft.endSeconds : undefined,
-      resolution: draft.sourceType === "video" ? VIDEO_RESOLUTION : undefined,
-      commentary: draft.commentary || "Audio commentary attached to this source.",
-      audioCommentaryUrl: recordedUrl || undefined,
-      createdAt: new Date().toISOString(),
-      author: authors.eduardo,
-      applause: 0,
-      commentCount: 0,
-      tags: draft.sourceType === "video" ? ["video", "new"] : draft.sourceType === "podcast" ? ["audio", "new"] : ["reading", "new"],
-    };
-    localStorage.setItem(`annotation:${id}`, JSON.stringify(annotation));
+    setPublishError("");
     try {
-      await fetch("/api/annotations", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(annotation) });
-    } catch {
-      // The shareable URL below carries the annotation when persistence is unavailable.
+      let mediaUrl = draft.mediaUrl.startsWith("/api/media") ? draft.mediaUrl : "";
+      let mediaContentType = draft.sourceType === "video" ? "video/mp4" : draft.sourceType === "podcast" ? "audio/mpeg" : undefined;
+      if (draft.sourceType !== "article" && !mediaUrl) {
+        const response = await fetch("/api/media/process", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ sourceUrl: draft.sourceUrl, mediaUrl: draft.mediaUrl, sourceType: draft.sourceType, startSeconds: draft.startSeconds, endSeconds: draft.endSeconds }) });
+        const payload = await response.json() as { url?: string; contentType?: string; error?: string };
+        if (!response.ok || !payload.url) throw new Error(payload.error || "Clip generation failed");
+        mediaUrl = payload.url;
+        mediaContentType = payload.contentType;
+        setDraft((current) => ({ ...current, mediaUrl }));
+      }
+
+      let audioCommentaryUrl: string | undefined;
+      if (recordedBlob) {
+        const form = new FormData();
+        form.set("kind", "commentary");
+        form.set("file", new File([recordedBlob], "commentary.webm", { type: recordedBlob.type || "audio/webm" }));
+        const response = await fetch("/api/media/upload", { method: "POST", body: form });
+        const payload = await response.json() as { url?: string; error?: string };
+        if (!response.ok || !payload.url) throw new Error(payload.error || "Audio commentary upload failed");
+        audioCommentaryUrl = payload.url;
+      }
+
+      const id = makeAnnotationId(draft.sourceTitle);
+      const annotation: Annotation = {
+        id,
+        sourceType: draft.sourceType,
+        sourceUrl: draft.sourceUrl,
+        sourceDomain: sourceDomain(draft.sourceUrl),
+        sourceTitle: draft.sourceTitle || "Untitled source",
+        sourcePublisher: draft.sourcePublisher || sourceDomain(draft.sourceUrl),
+        sourceImage: draft.sourceImage || undefined,
+        excerpt: draft.sourceType === "article" ? draft.selection : undefined,
+        mediaUrl: mediaUrl || undefined,
+        mediaContentType,
+        startSeconds: draft.sourceType !== "article" ? draft.startSeconds : undefined,
+        endSeconds: draft.sourceType !== "article" ? draft.endSeconds : undefined,
+        resolution: draft.sourceType === "video" ? VIDEO_RESOLUTION : undefined,
+        commentary: draft.commentary || "Audio commentary attached to this source.",
+        audioCommentaryUrl,
+        createdAt: new Date().toISOString(),
+        author: sessionAuthor(user),
+        applause: 0,
+        commentCount: 0,
+        tags: draft.sourceType === "video" ? ["video", "240p"] : draft.sourceType === "podcast" ? ["audio", "90 seconds or less"] : ["reading", "source-linked"],
+      };
+      const response = await fetch("/api/annotations", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(annotation) });
+      const payload = await response.json() as { error?: string };
+      if (!response.ok) throw new Error(payload.error || "Annotation could not be published");
+      localStorage.setItem(`annotation:${id}`, JSON.stringify(annotation));
+      router.push(`/annotation/${id}?d=${encodeAnnotation(annotation)}`);
+    } catch (reason) {
+      setPublishError(reason instanceof Error ? reason.message : "Annotation could not be published");
+      setPublishing(false);
     }
-    const encoded = encodeAnnotation(annotation);
-    router.push(`/annotation/${id}?d=${encoded}`);
   }
 
   return (
@@ -255,7 +297,7 @@ export function Studio() {
 
                       <div className="mt-10 grid grid-cols-1 gap-2 sm:grid-cols-3">
                         {sourceOptions.map((option) => (
-                          <button key={option.type} onClick={() => setDraft((current) => ({ ...current, sourceType: option.type }))} className={`pressable rounded-[1.3rem] border p-4 text-left ${draft.sourceType === option.type ? "border-[var(--ink)] bg-[var(--ink)] text-white" : "border-[var(--line)] hover:bg-[var(--paper-deep)]/55"}`}>
+                          <button key={option.type} onClick={() => setDraft((current) => ({ ...current, sourceType: option.type, sourceTitle: "", sourcePublisher: sourceDomain(current.sourceUrl), sourceImage: "", mediaUrl: "", selection: "", commentary: "" }))} className={`pressable rounded-[1.3rem] border p-4 text-left ${draft.sourceType === option.type ? "border-[var(--ink)] bg-[var(--ink)] text-white" : "border-[var(--line)] hover:bg-[var(--paper-deep)]/55"}`}>
                             <option.icon size={20} weight="light" />
                             <span className="mt-7 block text-sm font-semibold">{option.label}</span>
                             <span className={`mt-1 block text-[0.64rem] ${draft.sourceType === option.type ? "text-white/48" : "text-[var(--ink-muted)]"}`}>{option.note}</span>
@@ -300,6 +342,7 @@ export function Studio() {
                             <label><span className="mb-2 block text-[0.65rem] font-semibold">Starts at</span><input type="number" min={0} value={draft.startSeconds} onChange={(event) => setClip("startSeconds", Number(event.target.value))} className="w-full rounded-xl border border-[var(--line)] bg-white/45 px-4 py-3 font-mono text-sm outline-none focus:border-[var(--ink)]" /></label>
                             <label><span className="mb-2 block text-[0.65rem] font-semibold">Ends at</span><input type="number" min={1} value={draft.endSeconds} onChange={(event) => setClip("endSeconds", Number(event.target.value))} className="w-full rounded-xl border border-[var(--line)] bg-white/45 px-4 py-3 font-mono text-sm outline-none focus:border-[var(--ink)]" /></label>
                           </div>
+                          <div className="mt-6 flex items-start gap-2 rounded-xl bg-[var(--paper-deep)]/65 p-3 text-[0.65rem] leading-relaxed text-[var(--ink-muted)]"><Check size={14} weight="bold" className="mt-0.5 shrink-0 text-[var(--accent)]" /><span>{draft.sourceType === "video" ? "Publishing generates a new H.264 asset at exactly 240 pixels high, with this selected range only." : draft.mediaUrl ? "Original episode audio detected. Publishing creates a playable excerpt with this selected range only." : "Open this episode in the Chrome side panel so Annotated can detect its original audio stream."}</span></div>
                         </div>
                       )}
                     </>
@@ -363,11 +406,12 @@ export function Studio() {
                   </button>
                 ) : (
                   <button disabled={publishing} onClick={publish} className="pressable group flex items-center gap-3 rounded-full bg-[var(--accent)] py-2 pl-5 pr-2 text-sm font-semibold text-white disabled:opacity-55">
-                    {publishing ? "Publishing" : "Publish annotation"}
+                    {publishing ? (draft.sourceType === "article" ? "Publishing" : "Generating clip") : "Publish annotation"}
                     <span className="grid size-9 place-items-center rounded-full bg-white/14"><ArrowUpRight size={16} weight="light" /></span>
                   </button>
                 )}
               </div>
+              {publishError && <p role="alert" className="mt-4 flex items-center gap-2 rounded-xl bg-[var(--accent)]/8 px-4 py-3 text-xs text-[var(--accent)]"><WarningCircle size={15} weight="light" />{publishError}</p>}
             </div>
           </section>
 

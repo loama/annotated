@@ -15,20 +15,16 @@ export function MediaPreview({ annotation, interactive = false }: { annotation: 
   const duration = clipDuration(annotation.startSeconds || 0, annotation.endSeconds || 0);
 
   if (annotation.sourceType === "video") {
-    if (interactive && videoId) {
+    if (interactive && annotation.mediaUrl) {
       return (
         <div className="relative aspect-video overflow-hidden rounded-[1.55rem] bg-[#20211f]">
-          <iframe
-            className="size-full"
-            src={`https://www.youtube-nocookie.com/embed/${videoId}?start=${annotation.startSeconds || 0}&end=${annotation.endSeconds || 90}&rel=0&modestbranding=1`}
-            title={annotation.sourceTitle}
-            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-            allowFullScreen
-          />
-          <div className="pointer-events-none absolute bottom-3 right-3 rounded-full bg-black/70 px-2.5 py-1 font-mono text-[0.58rem] text-white/80">240p clip</div>
+          <video controls preload="metadata" src={annotation.mediaUrl} className="size-full object-contain" aria-label={`240p clip from ${annotation.sourceTitle}`} />
+          <div className="pointer-events-none absolute right-3 top-3 rounded-full bg-black/70 px-2.5 py-1 font-mono text-[0.58rem] text-white/80">encoded 240p</div>
         </div>
       );
     }
+
+    if (interactive && videoId) return <div className="relative aspect-video overflow-hidden rounded-[1.55rem] bg-[#20211f]"><iframe className="size-full" src={`https://www.youtube-nocookie.com/embed/${videoId}?start=${annotation.startSeconds || 0}&end=${annotation.endSeconds || 90}&rel=0&modestbranding=1`} title={annotation.sourceTitle} allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowFullScreen /></div>;
 
     return (
       <div className="group relative aspect-[16/10] overflow-hidden rounded-[1.55rem] bg-[#20211f]">
@@ -60,6 +56,7 @@ export function MediaPreview({ annotation, interactive = false }: { annotation: 
             <span key={index} className="wave-bar w-[2px] rounded-full bg-[var(--accent)]" style={{ height: `${22 + ((index * 19) % 74)}%`, animationDelay: `${index * -37}ms` }} />
           ))}
         </div>
+        {interactive && annotation.mediaUrl && <audio controls preload="metadata" src={annotation.mediaUrl} className="w-full" aria-label={`Audio excerpt from ${annotation.sourceTitle}`} />}
         <div className="flex items-center justify-between text-xs">
           <span className="font-medium">{formatTime(annotation.startSeconds)} to {formatTime(annotation.endSeconds)}</span>
           <span className="text-white/48">{annotation.sourcePublisher}</span>
