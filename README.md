@@ -12,7 +12,7 @@ Annotated is a source-first public notebook for the web. The Chrome side panel c
 - Public feed, profiles, follow controls, and comments
 - Original source link on every annotation
 - Visible fair-use claim flow on every annotation
-- Google and X account entry points with no password form
+- Google OAuth sign-in with a verified server session and no password form
 
 ## Run locally
 
@@ -33,8 +33,20 @@ bun run build
 
 ## Persistence
 
-Production annotations, comments, and claims use Vercel Blob through `BLOB_READ_WRITE_TOKEN`. Without that environment variable, the app remains fully explorable with its editorial seed feed and keeps newly published annotations in the current browser plus the share URL.
+Production annotations, comments, follows, claims, and generated media use private Vercel Blob storage through `BLOB_READ_WRITE_TOKEN`. Timed video excerpts are transcoded to H.264 at 240 pixels high, and audio excerpts and voice commentary are stored as durable MP3 assets. Seed annotations remain visible without credentials, while publishing and social mutations require a verified Google session.
+
+## Environment
+
+Create `.env.local` with:
+
+```bash
+BLOB_READ_WRITE_TOKEN=...
+AUTH_SECRET=...
+NEXT_PUBLIC_GOOGLE_CLIENT_ID=...
+```
+
+On macOS, set `YT_DLP_PATH` to a current local `yt-dlp` binary for YouTube clip development. Production uses the bundled Linux binary in `bin/yt-dlp`.
 
 ## Extension
 
-The `extension` directory contains the complete Manifest V3 side-panel extension. Its `APP_ORIGIN` and `frame-src` values point to the production deployment. Zip that directory for distribution after deployment.
+The `extension` directory contains the complete Manifest V3 side-panel extension. Its `APP_ORIGIN` and `frame-src` values point to the production deployment. A ready-to-load archive is published at `/annotated-sidepanel.zip`.
