@@ -35,7 +35,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         const response = await fetch("/api/auth/session", {
           cache: "no-store",
           credentials: "include",
-          headers: token ? { authorization: `Bearer ${token}` } : undefined,
+          headers: token ? { "x-annotated-session": token } : undefined,
         });
         if (!response.ok) throw new Error("Session unavailable");
         const payload = await response.json() as { user: SessionUser | null };
