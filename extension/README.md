@@ -12,4 +12,6 @@
 
 The extension opens as a native Chrome side panel. It reads only the active page when you click its toolbar icon. Click the icon again on another page to capture a new source. Selected text and media timing are passed directly into the annotation studio in your browser.
 
+The extension has access only to https://annotated-beta.vercel.app so the side panel can use your existing Annotated sign-in. Microphone access is requested by Chrome only when you choose to record audio commentary.
+
 Annotated does not collect browser history or monitor pages in the background. Read the full privacy policy at https://annotated-beta.vercel.app/privacy.

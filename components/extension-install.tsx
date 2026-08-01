@@ -29,7 +29,7 @@ const steps = [
   {
     number: "03",
     title: "Use List view, then select the folder",
-    body: "Open Chrome Extensions, enable Developer mode, and choose Load unpacked. On macOS, press Command + 2 in the folder dialog. Select “Annotated Extension - SELECT THIS FOLDER,” then click Select. Do not choose an individual file.",
+    body: "Open Chrome Extensions and remove any older Annotated version first. Enable Developer mode, then choose Load unpacked. On macOS, press Command + 2 in the folder dialog. Select “Annotated Extension - SELECT THIS FOLDER,” then click Select.",
   },
 ];
 
@@ -72,7 +72,7 @@ export function ExtensionInstall({ storeUrl, mobileDevice }: { storeUrl?: string
               <span className="grid size-9 place-items-center rounded-full bg-white/14 transition-transform duration-700 ease-[cubic-bezier(0.32,0.72,0,1)] group-hover:translate-y-0.5"><ArrowRight size={17} weight="light" /></span>
             </a>
           )}
-          <p className="mt-4 font-mono text-[0.58rem] uppercase tracking-[0.12em] text-[var(--ink-muted)]">{mobileDevice ? "The extension requires Chrome on desktop" : "Chrome 116+ on desktop · Native side panel · 18 KB"}</p>
+          <p className="mt-4 font-mono text-[0.58rem] uppercase tracking-[0.12em] text-[var(--ink-muted)]">{mobileDevice ? "The extension requires Chrome on desktop" : "Chrome 116+ on desktop · Native side panel · 16 KB"}</p>
         </div>
       </section>
 
@@ -144,7 +144,7 @@ export function ExtensionInstall({ storeUrl, mobileDevice }: { storeUrl?: string
                     <p className="mt-2 max-w-[52ch] text-sm leading-relaxed text-[var(--ink-muted)]">{step.body}</p>
                   </div>
                   {step.number === "01" && (
-                    <a href="/annotated-chrome-extension-v1.0.2.zip" download className="pressable col-start-2 mt-3 flex w-fit items-center gap-2 rounded-full bg-[var(--ink)] px-4 py-3 text-xs font-semibold text-white md:col-start-auto md:mt-0">
+                    <a href="/annotated-chrome-extension-v1.0.3.zip" download className="pressable col-start-2 mt-3 flex w-fit items-center gap-2 rounded-full bg-[var(--ink)] px-4 py-3 text-xs font-semibold text-white md:col-start-auto md:mt-0">
                       <DownloadSimple size={15} weight="light" />Download install folder
                     </a>
                   )}
@@ -172,7 +172,7 @@ export function ExtensionInstall({ storeUrl, mobileDevice }: { storeUrl?: string
             <div>
               <span className="flex items-center gap-2 font-mono text-[0.6rem] uppercase tracking-[0.14em] text-[var(--ink-muted)]"><LockKey size={14} weight="light" />Small permissions, clearly explained</span>
               <h2 className="mt-5 max-w-[17ch] text-3xl font-medium leading-[1.02] tracking-[-0.055em] md:text-4xl">Annotated looks at a page only when you open the side panel.</h2>
-              <p className="mt-5 max-w-[58ch] text-sm leading-relaxed text-[var(--ink-muted)]">It uses the active tab to read the URL, selected text, and current media time. It does not read browser history, run in the background on every page, or receive your Google password.</p>
+              <p className="mt-5 max-w-[58ch] text-sm leading-relaxed text-[var(--ink-muted)]">It uses the active tab to read the URL, selected text, and current media time. Access to annotated-beta.vercel.app keeps your signed-in session available in the side panel. It does not read browser history, run in the background on every page, or receive your Google password.</p>
             </div>
             <Link href="/privacy" className="pressable flex w-fit items-center gap-2 text-sm font-semibold">Read the privacy policy <ArrowUpRight size={16} weight="light" /></Link>
           </div>
