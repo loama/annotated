@@ -214,12 +214,18 @@ function sendCapture() {
   appFrame.contentWindow.postMessage({ type: "annotated:capture", capture: currentCapture }, APP_ORIGIN);
 }
 
+async function sendAuth() {
+  const cookie = await chrome.cookies.get({ url: APP_ORIGIN, name: "annotated_session" });
+  appFrame.contentWindow?.postMessage({ type: "annotated:extension-auth", token: cookie?.value || "" }, APP_ORIGIN);
+}
+
 function revealApp() {
   if (!frameReady || !currentCapture || currentCapture.error) return;
   restricted.hidden = true;
   loading.hidden = true;
   appFrame.hidden = false;
   sendCapture();
+  void sendAuth();
 }
 
 function applyCapture(capture) {
@@ -319,6 +325,11 @@ window.addEventListener("message", (event) => {
   if (event.data?.type === "annotated:ready") {
     frameReady = true;
     revealApp();
+    void sendAuth();
+    return;
+  }
+  if (event.data?.type === "annotated:sign-out") {
+    void chrome.cookies.remove({ url: APP_ORIGIN, name: "annotated_session" }).then(() => sendAuth());
     return;
   }
   if (event.data?.type === "annotated:cancel-video") {
@@ -367,6 +378,10 @@ cancelCaptureButton.addEventListener("click", () => {
 
 chrome.storage.onChanged.addListener((changes, areaName) => {
   if (areaName === "session" && changes[CAPTURE_KEY]) applyCapture(changes[CAPTURE_KEY].newValue || null);
+});
+
+chrome.cookies.onChanged.addListener((changeInfo) => {
+  if (changeInfo.cookie.name === "annotated_session" && changeInfo.cookie.domain.replace(/^\./, "") === new URL(APP_ORIGIN).hostname) void sendAuth();
 });
 
 document.getElementById("open").addEventListener("click", () => chrome.tabs.create({ url: APP_ORIGIN }));

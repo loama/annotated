@@ -4,7 +4,7 @@
   "version": "1.0.4",
   "description": "Clip the exact part that matters, add your perspective, and keep the original source attached.",
   "minimum_chrome_version": "116",
-  "permissions": ["activeTab", "scripting", "sidePanel", "storage", "tabCapture"],
+  "permissions": ["activeTab", "cookies", "scripting", "sidePanel", "storage", "tabCapture"],
   "host_permissions": ["https://annotated-beta.vercel.app/*"],
   "action": {
     "default_title": "Open Annotated",

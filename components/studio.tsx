@@ -121,7 +121,7 @@ function StudioPreview({ draft }: { draft: StudioDraft }) {
 export function Studio() {
   const searchParams = useSearchParams();
   const router = useRouter();
-  const { user, openSignIn } = useAuth();
+  const { user, openSignIn, sessionToken } = useAuth();
   const fromExtension = searchParams.get("extension") === "1";
   const extensionOrigin = searchParams.get("extensionOrigin") || "";
   const initialUrl = searchParams.get("source") || "";
@@ -390,7 +390,7 @@ export function Studio() {
           form.set("file", new File([captured.blob], "youtube-moment.webm", { type: captured.blob.type || "video/webm" }));
           form.set("trimStartSeconds", String(captured.trimStartSeconds));
           form.set("durationSeconds", String(captured.durationSeconds));
-          const response = await fetch("/api/media/upload", { method: "POST", body: form });
+          const response = await fetch("/api/media/upload", { method: "POST", headers: sessionToken ? { authorization: `Bearer ${sessionToken}` } : undefined, body: form });
           const payload = await response.json().catch(() => ({})) as { url?: string; contentType?: string; error?: string };
           if (!response.ok || !payload.url) throw new Error(payload.error || "The recorded video could not be encoded.");
           mediaUrl = payload.url;
@@ -403,7 +403,7 @@ export function Studio() {
         }
       }
       if (draft.sourceType !== "article" && !youtubeSource && !mediaUrl) {
-        const response = await fetch("/api/media/process", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ sourceUrl: draft.sourceUrl, mediaUrl: draft.mediaUrl, sourceType: draft.sourceType, startSeconds: draft.startSeconds, endSeconds: draft.endSeconds }) });
+        const response = await fetch("/api/media/process", { method: "POST", headers: { "content-type": "application/json", ...(sessionToken ? { authorization: `Bearer ${sessionToken}` } : {}) }, body: JSON.stringify({ sourceUrl: draft.sourceUrl, mediaUrl: draft.mediaUrl, sourceType: draft.sourceType, startSeconds: draft.startSeconds, endSeconds: draft.endSeconds }) });
         const payload = await response.json() as { url?: string; contentType?: string; playbackMode?: Annotation["playbackMode"]; error?: string };
         if (!response.ok || !payload.url) throw new Error(payload.error || "Clip generation failed");
         mediaUrl = payload.url;
@@ -418,7 +418,7 @@ export function Studio() {
         const form = new FormData();
         form.set("kind", "commentary");
         form.set("file", new File([recordedBlob], "commentary.webm", { type: recordedBlob.type || "audio/webm" }));
-        const response = await fetch("/api/media/upload", { method: "POST", body: form });
+        const response = await fetch("/api/media/upload", { method: "POST", headers: sessionToken ? { authorization: `Bearer ${sessionToken}` } : undefined, body: form });
         const payload = await response.json().catch(() => ({})) as { url?: string; error?: string };
         if (!response.ok || !payload.url) throw new Error(payload.error || "Audio commentary upload failed");
         audioCommentaryUrl = payload.url;
@@ -448,7 +448,7 @@ export function Studio() {
         commentCount: 0,
         tags: youtubeSource ? ["video", playbackMode === "encoded" ? "encoded 240p" : "YouTube moment", "90 seconds or less"] : draft.sourceType === "video" ? ["video", "encoded 240p"] : draft.sourceType === "podcast" ? ["audio", "90 seconds or less"] : ["reading", "source-linked"],
       };
-      const response = await fetch("/api/annotations", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(annotation) });
+      const response = await fetch("/api/annotations", { method: "POST", headers: { "content-type": "application/json", ...(sessionToken ? { authorization: `Bearer ${sessionToken}` } : {}) }, body: JSON.stringify(annotation) });
       const payload = await response.json() as { error?: string };
       if (!response.ok) throw new Error(payload.error || "Annotation could not be published");
       localStorage.setItem(`annotation:${id}`, JSON.stringify(annotation));

@@ -119,7 +119,7 @@ describe("Chrome extension capture", () => {
 
   test("declares only the permissions used by the capture flow", async () => {
     const manifest = await Bun.file(new URL("../extension/manifest.json", import.meta.url)).json();
-    expect(manifest.permissions).toEqual(["activeTab", "scripting", "sidePanel", "storage", "tabCapture"]);
+    expect(manifest.permissions).toEqual(["activeTab", "cookies", "scripting", "sidePanel", "storage", "tabCapture"]);
     expect(manifest.host_permissions).toEqual(["https://annotated-beta.vercel.app/*"]);
     expect(manifest.host_permissions).not.toContain("<all_urls>");
     expect(manifest.host_permissions.every((permission: string) => !permission.includes("*://"))).toBe(true);
@@ -145,7 +145,8 @@ describe("Chrome extension capture", () => {
     expect(source).toContain('type: "annotated:video-recording"');
     expect(source).toContain("sourceUrl !== currentCapture.sourceUrl || tabId !== currentCapture.tabId");
     expect(source).toContain('type: "annotated:video-ready"');
-    expect(source).not.toContain("cookies");
+    expect(source).toContain('chrome.cookies.get({ url: APP_ORIGIN, name: "annotated_session" })');
+    expect(source).not.toContain("chrome.cookies.getAll");
   });
 
   test("reveals a frame that becomes ready before its capture arrives", async () => {
@@ -166,6 +167,11 @@ describe("Chrome extension capture", () => {
     const chrome = {
       runtime: { getURL() { return "chrome-extension://abcdefghijklmnopabcdefghijklmnop/"; } },
       tabs: { create() {} },
+      cookies: {
+        async get() { return null; },
+        async remove() { return null; },
+        onChanged: { addListener() {} },
+      },
       storage: {
         session: { async get() { return {}; } },
         onChanged: { addListener(listener: (changes: Record<string, { newValue?: unknown }>, areaName: string) => void) { storageListeners.push(listener); } },
