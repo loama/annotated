@@ -28,8 +28,8 @@ const steps = [
   },
   {
     number: "03",
-    title: "Select the folder, not a file",
-    body: "Open Chrome Extensions, enable Developer mode, and choose Load unpacked. Select the entire folder named “Annotated Extension - SELECT THIS FOLDER.” The files inside may look greyed out because Chrome accepts the folder itself. Click Select.",
+    title: "Use List view, then select the folder",
+    body: "Open Chrome Extensions, enable Developer mode, and choose Load unpacked. On macOS, press Command + 2 in the folder dialog. Select “Annotated Extension - SELECT THIS FOLDER,” then click Select. Do not choose an individual file.",
   },
 ];
 
@@ -144,12 +144,13 @@ export function ExtensionInstall({ storeUrl, mobileDevice }: { storeUrl?: string
                     <p className="mt-2 max-w-[52ch] text-sm leading-relaxed text-[var(--ink-muted)]">{step.body}</p>
                   </div>
                   {step.number === "01" && (
-                    <a href="/annotated-chrome-extension-v1.0.1.zip" download className="pressable col-start-2 mt-3 flex w-fit items-center gap-2 rounded-full bg-[var(--ink)] px-4 py-3 text-xs font-semibold text-white md:col-start-auto md:mt-0">
+                    <a href="/annotated-chrome-extension-v1.0.2.zip" download className="pressable col-start-2 mt-3 flex w-fit items-center gap-2 rounded-full bg-[var(--ink)] px-4 py-3 text-xs font-semibold text-white md:col-start-auto md:mt-0">
                       <DownloadSimple size={15} weight="light" />Download install folder
                     </a>
                   )}
                   {step.number === "03" && (
                     <div className="col-start-2 mt-3 flex flex-col items-start gap-2 md:col-start-auto md:mt-0 md:items-end">
+                      <span className="rounded-md bg-[var(--paper-deep)] px-3 py-2 font-mono text-[0.62rem] font-semibold">macOS: ⌘2 enables Select</span>
                       <button type="button" onClick={copyExtensionsAddress} className="pressable flex w-fit items-center gap-2 rounded-full border border-[var(--line)] px-4 py-3 text-xs font-semibold">
                         {copyState === "copied" ? <Check size={15} weight="bold" /> : <Copy size={15} weight="light" />}{copyState === "copied" ? "Copied" : "Copy address"}
                       </button>
