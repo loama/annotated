@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { mkdtemp, rm } from "node:fs/promises";
+import { mkdtemp, readdir, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -38,7 +38,7 @@ async function loadBackground(options?: { scriptResult?: Record<string, unknown>
 
 describe("Chrome extension capture", () => {
   test("packages one unmistakable folder that Chrome can load unpacked", async () => {
-    const archivePath = fileURLToPath(new URL("../public/annotated-chrome-extension-v1.0.3.zip", import.meta.url));
+    const archivePath = fileURLToPath(new URL("../public/annotated-chrome-extension-v1.0.4.zip", import.meta.url));
     const listingProcess = Bun.spawnSync(["/usr/bin/unzip", "-Z1", archivePath]);
     expect(listingProcess.exitCode).toBe(0);
 
@@ -56,7 +56,7 @@ describe("Chrome extension capture", () => {
       const manifestPath = join(extractionRoot, installRoot, "manifest.json");
       const manifest = await Bun.file(manifestPath).json();
       expect(manifest.manifest_version).toBe(3);
-      expect(manifest.version).toBe("1.0.3");
+      expect(manifest.version).toBe("1.0.4");
       const installGuide = await Bun.file(join(extractionRoot, installRoot, "INSTALL.txt")).text();
       expect(installGuide).toContain("Command + 2");
       expect(installGuide).toContain("List view enables Select");
@@ -69,6 +69,13 @@ describe("Chrome extension capture", () => {
       ] as string[];
       for (const referencedFile of referencedFiles) {
         expect(await Bun.file(join(extractionRoot, installRoot, referencedFile)).exists()).toBe(true);
+      }
+      const sourceRoot = fileURLToPath(new URL("../extension", import.meta.url));
+      const sourceFiles = (await readdir(sourceRoot)).filter((name) => name !== "README.md").sort();
+      for (const sourceFile of sourceFiles) {
+        const sourceBytes = await Bun.file(join(sourceRoot, sourceFile)).arrayBuffer();
+        const packagedBytes = await Bun.file(join(extractionRoot, installRoot, sourceFile)).arrayBuffer();
+        expect(Buffer.compare(Buffer.from(sourceBytes), Buffer.from(packagedBytes))).toBe(0);
       }
     } finally {
       await rm(extractionRoot, { recursive: true, force: true });
@@ -92,6 +99,8 @@ describe("Chrome extension capture", () => {
         selection: "A useful passage",
         startSeconds: 12,
         endSeconds: 72,
+        mediaDuration: 0,
+        tabId: 7,
         capturedAt: expect.any(Number),
       },
     });
@@ -110,7 +119,7 @@ describe("Chrome extension capture", () => {
 
   test("declares only the permissions used by the capture flow", async () => {
     const manifest = await Bun.file(new URL("../extension/manifest.json", import.meta.url)).json();
-    expect(manifest.permissions).toEqual(["activeTab", "scripting", "sidePanel", "storage"]);
+    expect(manifest.permissions).toEqual(["activeTab", "scripting", "sidePanel", "storage", "tabCapture"]);
     expect(manifest.host_permissions).toEqual(["https://annotated-beta.vercel.app/*"]);
     expect(manifest.host_permissions).not.toContain("<all_urls>");
     expect(manifest.host_permissions.every((permission: string) => !permission.includes("*://"))).toBe(true);
@@ -121,6 +130,24 @@ describe("Chrome extension capture", () => {
     expect(html).toMatch(/<iframe[^>]+id="app"[^>]+allow="microphone"/);
   });
 
+  test("records a bounded 240p player region without YouTube cookies", async () => {
+    const source = await Bun.file(new URL("../extension/sidepanel.js", import.meta.url)).text();
+    expect(source).toContain("chrome.tabCapture.capture({ audio: true, video: true }");
+    expect(source).toContain("canvas.width = 426");
+    expect(source).toContain("canvas.height = 240");
+    expect(source).toContain("Math.min(start + 90");
+    expect(source).toContain("videoBitsPerSecond: 230_000");
+    expect(source).toContain("blob.size > 4_000_000");
+    expect(source).toContain('startCaptureButton.addEventListener("click"');
+    expect(source).toContain("const streamPromise = captureCurrentTab();");
+    expect(source).toContain("waitForPageVideoEnd");
+    expect(source).toContain("playbackWallSeconds > duration + 0.75");
+    expect(source).toContain('type: "annotated:video-recording"');
+    expect(source).toContain("sourceUrl !== currentCapture.sourceUrl || tabId !== currentCapture.tabId");
+    expect(source).toContain('type: "annotated:video-ready"');
+    expect(source).not.toContain("cookies");
+  });
+
   test("reveals a frame that becomes ready before its capture arrives", async () => {
     const source = await Bun.file(new URL("../extension/sidepanel.js", import.meta.url)).text();
     const elementListeners = new Map<string, Array<() => void>>();
@@ -129,7 +156,7 @@ describe("Chrome extension capture", () => {
     const posted: unknown[] = [];
     const contentWindow = { postMessage(message: unknown) { posted.push(message); } };
     const elements: Record<string, { hidden: boolean; textContent?: string; src?: string; contentWindow?: typeof contentWindow; addEventListener: (name: string, listener: () => void) => void }> = {};
-    for (const id of ["app", "loading", "restricted", "restricted-message", "open"]) {
+    for (const id of ["app", "loading", "restricted", "restricted-message", "capture-confirm", "start-capture", "cancel-capture", "open"]) {
       elements[id] = {
         hidden: id === "restricted" || id === "app",
         contentWindow: id === "app" ? contentWindow : undefined,
