@@ -99,7 +99,7 @@ export async function processYouTubeClip(url: string, start: number, duration: n
   const ytDlpPath = process.platform === "linux" ? path.join(process.cwd(), "bin", "yt-dlp") : process.env.YT_DLP_PATH;
   if (!ytDlpPath) throw new Error("YouTube clipping is unavailable in this environment");
   try {
-    await chmod(ytDlpPath, 0o755);
+    if (process.platform !== "linux") await chmod(ytDlpPath, 0o755);
     await run(ytDlpPath, [
       "--no-playlist",
       "--no-progress",
