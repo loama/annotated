@@ -1,4 +1,4 @@
-import { list, put } from "@vercel/blob";
+import { get, list, put } from "@vercel/blob";
 import { NextRequest, NextResponse } from "next/server";
 import { seedAnnotations } from "@/lib/data";
 import { MAX_CLIP_SECONDS, VIDEO_RESOLUTION } from "@/lib/rules";
@@ -34,8 +34,9 @@ async function dynamicAnnotations() {
   const result = await list({ prefix: "annotations/", limit: 80, token: blobToken });
   const annotations = await Promise.all(result.blobs.map(async (blob) => {
     try {
-      const response = await fetch(blob.url, { cache: "no-store" });
-      return response.ok ? await response.json() as Annotation : null;
+      const result = await get(blob.pathname, { access: "private", useCache: false, token: blobToken });
+      if (!result || result.statusCode !== 200) return null;
+      return await new Response(result.stream).json() as Annotation;
     } catch { return null; }
   }));
   return annotations.filter((annotation): annotation is Annotation => Boolean(annotation));
@@ -69,7 +70,7 @@ export async function POST(request: NextRequest) {
   const blobToken = token();
   if (!blobToken) return NextResponse.json({ annotation: payload, persisted: false }, { status: 201 });
   await put(`annotations/${payload.id}.json`, JSON.stringify(payload), {
-    access: "public",
+    access: "private",
     addRandomSuffix: false,
     allowOverwrite: true,
     contentType: "application/json",
