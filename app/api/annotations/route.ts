@@ -1,6 +1,6 @@
 import { get, list, put } from "@vercel/blob";
 import { NextRequest, NextResponse } from "next/server";
-import { seedAnnotations } from "@/lib/data";
+import { seedAnnotations, seedComments } from "@/lib/data";
 import { MAX_CLIP_SECONDS, VIDEO_RESOLUTION } from "@/lib/rules";
 import type { Annotation } from "@/lib/types";
 import { readSession, SESSION_COOKIE } from "@/lib/auth";
@@ -46,6 +46,21 @@ async function dynamicAnnotations() {
   return annotations.filter((annotation): annotation is Annotation => Boolean(annotation));
 }
 
+async function withCommentCounts(annotations: Annotation[]) {
+  const blobToken = token();
+  const storedCounts = new Map<string, number>();
+  if (blobToken) {
+    const comments = await list({ prefix: "comments/", limit: 1000, token: blobToken });
+    for (const blob of comments.blobs) {
+      const annotationId = blob.pathname.split("/")[1];
+      if (annotationId) storedCounts.set(annotationId, (storedCounts.get(annotationId) || 0) + 1);
+    }
+  }
+  const seededCounts = new Map<string, number>();
+  for (const comment of seedComments) seededCounts.set(comment.annotationId, (seededCounts.get(comment.annotationId) || 0) + 1);
+  return annotations.map((annotation) => ({ ...annotation, commentCount: (seededCounts.get(annotation.id) || 0) + (storedCounts.get(annotation.id) || 0) }));
+}
+
 export async function GET(request: NextRequest) {
   const id = request.nextUrl.searchParams.get("id");
   const seeded = id ? seedAnnotations.find((annotation) => annotation.id === id) : null;
@@ -57,7 +72,7 @@ export async function GET(request: NextRequest) {
       if (!annotation) return NextResponse.json({ error: "Annotation not found" }, { status: 404 });
       return NextResponse.json({ annotation });
     }
-    const annotations = [...dynamic, ...seedAnnotations].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+    const annotations = (await withCommentCounts([...dynamic, ...seedAnnotations])).sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
     return NextResponse.json({ annotations });
   } catch {
     if (id) return NextResponse.json({ error: "Annotation not found" }, { status: 404 });

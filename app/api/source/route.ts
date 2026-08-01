@@ -29,6 +29,22 @@ export async function POST(request: NextRequest) {
     if (/\.(mp3|m4a|wav|ogg|aac)(\?|$)/i.test(url.pathname)) return NextResponse.json({ title: url.pathname.split("/").pop() || "Audio source", publisher: sourceDomain(url.toString()), image: "", selection: "", mediaUrl: url.toString() });
     if (/\.(mp4|webm|mov)(\?|$)/i.test(url.pathname)) return NextResponse.json({ title: url.pathname.split("/").pop() || "Video source", publisher: sourceDomain(url.toString()), image: "", selection: "", mediaUrl: url.toString() });
 
+    const nprPodcastId = url.hostname.endsWith("npr.org") ? url.pathname.match(/\/podcasts\/(\d+)/)?.[1] : undefined;
+    if (nprPodcastId && input.type === "podcast") {
+      const feedUrl = new URL(`https://feeds.npr.org/${nprPodcastId}/podcast.xml`);
+      const feedResponse = await fetchPublic(feedUrl, { cache: "no-store", signal: AbortSignal.timeout(15_000), headers: { "user-agent": "Annotated/1.0 (+https://annotated-beta.vercel.app)" } });
+      if (!feedResponse.ok) throw new Error(`The podcast feed returned ${feedResponse.status}`);
+      const feed = load((await feedResponse.text()).slice(0, 3_000_000), { xmlMode: true });
+      const channel = feed("channel").first();
+      const episode = channel.find("item").first();
+      const title = episode.find("title").first().text().trim() || channel.find("title").first().text().trim() || "NPR podcast";
+      const description = episode.find("description").first().text().replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
+      const mediaUrl = episode.find("enclosure").first().attr("url") || "";
+      const image = episode.find("itunes\\:image").attr("href") || channel.find("itunes\\:image").attr("href") || "";
+      if (!mediaUrl) throw new Error("The podcast feed did not include playable episode audio");
+      return NextResponse.json({ title: title.slice(0, 220), publisher: channel.find("title").first().text().trim().slice(0, 120) || "NPR", image, selection: description.slice(0, 1200), mediaUrl: absolute(mediaUrl, feedUrl) });
+    }
+
     const response = await fetchPublic(url, { cache: "no-store", signal: AbortSignal.timeout(12_000), headers: { "user-agent": "Mozilla/5.0 (compatible; Annotated/1.0; +https://annotated-beta.vercel.app)" } });
     if (!response.ok) throw new Error(`The source returned ${response.status}`);
     const declaredSize = Number(response.headers.get("content-length") || 0);

@@ -1,6 +1,7 @@
 import { del, get, list, put } from "@vercel/blob";
 import { NextRequest, NextResponse } from "next/server";
 import { readSession, SESSION_COOKIE } from "@/lib/auth";
+import { sessionAuthor } from "@/lib/identity";
 
 export const dynamic = "force-dynamic";
 
@@ -38,6 +39,7 @@ export async function POST(request: NextRequest) {
   try { authorId = String((await request.json() as { authorId?: string }).authorId || ""); }
   catch { return NextResponse.json({ error: "Invalid request" }, { status: 400 }); }
   if (!authorId) return NextResponse.json({ error: "authorId is required" }, { status: 400 });
+  if (authorId === sessionAuthor(user).id) return NextResponse.json({ error: "You cannot follow your own profile" }, { status: 422 });
   const blobToken = token();
   if (!blobToken) return NextResponse.json({ error: "Follow storage is unavailable" }, { status: 503 });
   const pathname = `follows/${safe(user.id)}/${safe(authorId)}.json`;

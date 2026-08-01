@@ -129,6 +129,7 @@ export function Studio() {
   const [analyzing, setAnalyzing] = useState(false);
   const [commentMode, setCommentMode] = useState<"text" | "audio">("text");
   const [recording, setRecording] = useState(false);
+  const [requestingMicrophone, setRequestingMicrophone] = useState(false);
   const [recordedUrl, setRecordedUrl] = useState<string | null>(null);
   const [recordedBlob, setRecordedBlob] = useState<Blob | null>(null);
   const [recordingSeconds, setRecordingSeconds] = useState(0);
@@ -192,6 +193,8 @@ export function Studio() {
       setRecording(false);
       return;
     }
+    setRequestingMicrophone(true);
+    setSourceError("");
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       chunks.current = [];
@@ -209,7 +212,7 @@ export function Studio() {
       setRecording(true);
     } catch {
       setSourceError("Microphone access is needed to record audio commentary.");
-    }
+    } finally { setRequestingMicrophone(false); }
   }
 
   async function publish() {
@@ -367,9 +370,9 @@ export function Studio() {
                         <label className="mt-6 block flex-1"><span className="sr-only">Commentary</span><textarea autoFocus value={draft.commentary} onChange={(event) => setDraft((current) => ({ ...current, commentary: event.target.value }))} rows={10} maxLength={1200} placeholder="The part I keep returning to is..." className="w-full resize-none rounded-[1.5rem] border border-[var(--line)] bg-white/45 p-6 text-xl leading-relaxed tracking-[-0.03em] outline-none transition-colors placeholder:text-[var(--ink-muted)]/42 focus:border-[var(--ink)]" /><span className="mt-2 block text-right font-mono text-[0.58rem] text-[var(--ink-muted)]">{draft.commentary.length} / 1,200</span></label>
                       ) : (
                         <div className="mt-6 flex flex-1 flex-col items-center justify-center rounded-[1.5rem] border border-[var(--line)] bg-white/30 p-8 text-center">
-                          <button onClick={toggleRecording} className={`pressable relative grid size-20 place-items-center rounded-full ${recording ? "recording-dot bg-[var(--accent)] text-white" : "bg-[var(--ink)] text-white"}`} aria-label={recording ? "Stop recording" : "Start recording"}>{recording ? <Stop size={22} weight="fill" /> : <Microphone size={24} weight="light" />}</button>
-                          <p className="mt-6 text-lg font-medium tracking-[-0.04em]">{recording ? "Recording your thought" : recordedUrl ? "Your voice note is ready" : "Record audio commentary"}</p>
-                          <p className="mt-2 font-mono text-[0.62rem] text-[var(--ink-muted)]">{recording ? `${formatTime(recordingSeconds)} · tap to finish` : "Microphone access stays in your browser"}</p>
+                          <button disabled={requestingMicrophone} onClick={toggleRecording} className={`pressable relative grid size-20 place-items-center rounded-full disabled:opacity-55 ${recording ? "recording-dot bg-[var(--accent)] text-white" : "bg-[var(--ink)] text-white"}`} aria-label={recording ? "Stop recording" : requestingMicrophone ? "Waiting for microphone permission" : "Start recording"}>{recording ? <Stop size={22} weight="fill" /> : <Microphone size={24} weight="light" />}</button>
+                          <p className="mt-6 text-lg font-medium tracking-[-0.04em]">{requestingMicrophone ? "Allow microphone access" : recording ? "Recording your thought" : recordedUrl ? "Your voice note is ready" : "Record audio commentary"}</p>
+                          <p className="mt-2 font-mono text-[0.62rem] text-[var(--ink-muted)]">{requestingMicrophone ? "Use the browser prompt to continue" : recording ? `${formatTime(recordingSeconds)} · tap to finish` : "Your recording is uploaded only when you publish"}</p>
                           {recordedUrl && !recording && <audio controls src={recordedUrl} className="mt-6 w-full max-w-sm" />}
                         </div>
                       )}
