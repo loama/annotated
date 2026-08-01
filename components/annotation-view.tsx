@@ -19,11 +19,12 @@ import {
 import { useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useMemo, useState } from "react";
 import type { Annotation, Comment } from "@/lib/types";
-import { authors, seedAnnotations, seedComments } from "@/lib/data";
+import { seedAnnotations, seedComments } from "@/lib/data";
 import { decodeAnnotation } from "@/lib/encoding";
 import { AppShell } from "./app-shell";
 import { ClaimSheet } from "./claim-sheet";
 import { MediaPreview } from "./media-preview";
+import { useAuth } from "./auth-provider";
 
 function formatDate(dateString: string) {
   return new Intl.DateTimeFormat("en", { month: "long", day: "numeric", year: "numeric" }).format(new Date(dateString));
@@ -35,12 +36,15 @@ function AnnotationContent({ annotationId }: { annotationId: string }) {
   const [loading, setLoading] = useState(!annotation);
   const [claimOpen, setClaimOpen] = useState(false);
   const [following, setFollowing] = useState(false);
+  const [followerCount, setFollowerCount] = useState(0);
+  const [followBusy, setFollowBusy] = useState(false);
   const [applauded, setApplauded] = useState(false);
   const [copied, setCopied] = useState(false);
   const [comments, setComments] = useState<Comment[]>(() => seedComments.filter((item) => item.annotationId === annotationId));
   const [commentBody, setCommentBody] = useState("");
   const [commentError, setCommentError] = useState("");
   const [posting, setPosting] = useState(false);
+  const { user, openSignIn } = useAuth();
 
   useEffect(() => {
     const encoded = searchParams.get("d");
@@ -70,6 +74,14 @@ function AnnotationContent({ annotationId }: { annotationId: string }) {
       .catch(() => undefined);
   }, [annotationId]);
 
+  useEffect(() => {
+    if (!annotation) return;
+    fetch(`/api/follows?authorId=${encodeURIComponent(annotation.author.id)}`, { cache: "no-store" })
+      .then((response) => response.ok ? response.json() : Promise.reject(new Error("Unable to load follow state")))
+      .then((payload: { following: boolean; followerCount: number }) => { setFollowing(payload.following); setFollowerCount(payload.followerCount); })
+      .catch(() => undefined);
+  }, [annotation]);
+
   const related = useMemo(() => seedAnnotations.filter((item) => item.id !== annotationId).slice(0, 2), [annotationId]);
 
   async function share() {
@@ -80,15 +92,30 @@ function AnnotationContent({ annotationId }: { annotationId: string }) {
 
   async function postComment(event: React.FormEvent) {
     event.preventDefault();
+    if (!user) { openSignIn(); return; }
     if (commentBody.trim().length < 3) { setCommentError("Write a little more before posting."); return; }
     setPosting(true);
-    const comment: Comment = { id: `comment-${Date.now().toString(36)}`, annotationId, author: authors.eduardo, body: commentBody.trim(), createdAt: new Date().toISOString() };
-    setComments((current) => [...current, comment]);
-    setCommentBody("");
     setCommentError("");
-    try { await fetch("/api/comments", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(comment) }); }
-    catch { setCommentError("Saved here, but the public feed could not be reached."); }
+    try {
+      const response = await fetch("/api/comments", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ id: `comment-${Date.now().toString(36)}`, annotationId, body: commentBody.trim() }) });
+      const payload = await response.json() as { comment?: Comment; error?: string };
+      if (!response.ok || !payload.comment) throw new Error(payload.error || "Comment could not be posted");
+      setComments((current) => [...current, payload.comment as Comment]);
+      setCommentBody("");
+    }
+    catch (reason) { setCommentError(reason instanceof Error ? reason.message : "Comment could not be posted."); }
     finally { setPosting(false); }
+  }
+
+  async function toggleFollow() {
+    if (!user) { openSignIn(); return; }
+    if (!annotation || followBusy) return;
+    setFollowBusy(true);
+    try {
+      const response = await fetch("/api/follows", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ authorId: annotation.author.id }) });
+      const payload = await response.json() as { following?: boolean; followerCount?: number };
+      if (response.ok) { setFollowing(Boolean(payload.following)); setFollowerCount(payload.followerCount || 0); }
+    } finally { setFollowBusy(false); }
   }
 
   if (loading) return <AnnotationLoading />;
@@ -137,7 +164,7 @@ function AnnotationContent({ annotationId }: { annotationId: string }) {
           </article>
 
           <aside className="space-y-4 lg:sticky lg:top-32 lg:self-start">
-            <div className="paper-shell"><div className="paper-core p-6"><div className="flex items-center gap-4"><span className="grid size-12 place-items-center rounded-full text-sm font-semibold text-white" style={{ background: annotation.author.accent }}>{annotation.author.initials}</span><div><p className="font-semibold tracking-[-0.03em]">{annotation.author.name}</p><p className="text-xs text-[var(--ink-muted)]">{annotation.author.handle}</p></div></div><p className="mt-5 text-sm leading-relaxed text-[var(--ink-muted)]">{annotation.author.bio}</p><button onClick={() => setFollowing((value) => !value)} className={`pressable mt-6 flex w-full items-center justify-center gap-2 rounded-full py-3 text-xs font-semibold ${following ? "border border-[var(--line)]" : "bg-[var(--ink)] text-white"}`}>{following ? <Check size={14} weight="bold" /> : <Plus size={14} weight="bold" />}{following ? "Following" : "Follow"}</button></div></div>
+            <div className="paper-shell"><div className="paper-core p-6"><div className="flex items-center gap-4"><span className="grid size-12 place-items-center rounded-full text-sm font-semibold text-white" style={{ background: annotation.author.accent }}>{annotation.author.initials}</span><div><p className="font-semibold tracking-[-0.03em]">{annotation.author.name}</p><p className="text-xs text-[var(--ink-muted)]">{annotation.author.handle}</p></div></div><p className="mt-5 text-sm leading-relaxed text-[var(--ink-muted)]">{annotation.author.bio}</p><p className="mt-4 font-mono text-[0.58rem] uppercase tracking-[0.12em] text-[var(--ink-muted)]">{followerCount} {followerCount === 1 ? "follower" : "followers"}</p><button disabled={followBusy} onClick={toggleFollow} className={`pressable mt-5 flex w-full items-center justify-center gap-2 rounded-full py-3 text-xs font-semibold disabled:opacity-55 ${following ? "border border-[var(--line)]" : "bg-[var(--ink)] text-white"}`}>{following ? <Check size={14} weight="bold" /> : <Plus size={14} weight="bold" />}{followBusy ? "Saving…" : following ? "Following" : "Follow"}</button></div></div>
             <div className="ink-shell"><div className="ink-core p-6"><span className="eyebrow text-white/55">Source integrity</span><p className="mt-5 text-lg font-medium leading-snug tracking-[-0.04em]">The source never disappears behind the commentary.</p><p className="mt-3 text-xs leading-relaxed text-white/48">Open the original work at any time. If this excerpt misuses it, file a claim for review.</p><button onClick={() => setClaimOpen(true)} className="pressable mt-6 flex w-full items-center justify-center gap-2 rounded-full bg-[var(--paper-bright)] py-3 text-xs font-semibold text-[var(--ink)]"><Flag size={14} weight="light" />File a claim</button></div></div>
           </aside>
         </div>

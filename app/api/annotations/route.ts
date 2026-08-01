@@ -3,6 +3,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { seedAnnotations } from "@/lib/data";
 import { MAX_CLIP_SECONDS, VIDEO_RESOLUTION } from "@/lib/rules";
 import type { Annotation } from "@/lib/types";
+import { readSession, SESSION_COOKIE } from "@/lib/auth";
+import { sessionAuthor } from "@/lib/identity";
 
 export const dynamic = "force-dynamic";
 
@@ -16,11 +18,13 @@ function validAnnotation(value: unknown): value is Annotation {
   if (!annotation.id || !annotation.sourceUrl || !annotation.sourceTitle || !annotation.commentary || !annotation.author?.id) return false;
   try { new URL(annotation.sourceUrl); } catch { return false; }
   if (annotation.sourceType === "video") {
+    if (!annotation.mediaUrl?.startsWith("/api/media?path=media%2F")) return false;
     if (annotation.resolution !== VIDEO_RESOLUTION) return false;
     if (typeof annotation.startSeconds !== "number" || typeof annotation.endSeconds !== "number") return false;
     if (annotation.endSeconds - annotation.startSeconds > MAX_CLIP_SECONDS || annotation.endSeconds <= annotation.startSeconds) return false;
   }
   if (annotation.sourceType === "podcast") {
+    if (!annotation.mediaUrl?.startsWith("/api/media?path=media%2F")) return false;
     if (typeof annotation.startSeconds !== "number" || typeof annotation.endSeconds !== "number") return false;
     if (annotation.endSeconds - annotation.startSeconds > MAX_CLIP_SECONDS || annotation.endSeconds <= annotation.startSeconds) return false;
   }
@@ -62,10 +66,13 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
+  const user = await readSession(request.cookies.get(SESSION_COOKIE)?.value);
+  if (!user) return NextResponse.json({ error: "Sign in with Google to publish annotations" }, { status: 401 });
   let payload: unknown;
   try { payload = await request.json(); }
   catch { return NextResponse.json({ error: "Invalid JSON" }, { status: 400 }); }
   if (!validAnnotation(payload)) return NextResponse.json({ error: "Annotation does not meet the publishing rules" }, { status: 422 });
+  payload.author = sessionAuthor(user);
 
   const blobToken = token();
   if (!blobToken) return NextResponse.json({ annotation: payload, persisted: false }, { status: 201 });

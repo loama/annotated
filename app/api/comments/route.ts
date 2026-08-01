@@ -1,6 +1,8 @@
 import { get, list, put } from "@vercel/blob";
 import { NextRequest, NextResponse } from "next/server";
 import { seedComments } from "@/lib/data";
+import { readSession, SESSION_COOKIE } from "@/lib/auth";
+import { sessionAuthor } from "@/lib/identity";
 import type { Comment } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
@@ -29,10 +31,13 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
-  let comment: Comment;
-  try { comment = await request.json() as Comment; }
+  const user = await readSession(request.cookies.get(SESSION_COOKIE)?.value);
+  if (!user) return NextResponse.json({ error: "Sign in with Google to comment" }, { status: 401 });
+  let input: Pick<Comment, "id" | "annotationId" | "body">;
+  try { input = await request.json() as Pick<Comment, "id" | "annotationId" | "body">; }
   catch { return NextResponse.json({ error: "Invalid JSON" }, { status: 400 }); }
-  if (!comment.id || !comment.annotationId || !comment.author?.id || comment.body?.trim().length < 3) return NextResponse.json({ error: "Comment is incomplete" }, { status: 422 });
+  if (!input.id || !input.annotationId || input.body?.trim().length < 3) return NextResponse.json({ error: "Comment is incomplete" }, { status: 422 });
+  const comment: Comment = { ...input, body: input.body.trim(), author: sessionAuthor(user), createdAt: new Date().toISOString() };
   const blobToken = token();
   if (blobToken) {
     await put(`comments/${comment.annotationId}/${comment.id}.json`, JSON.stringify(comment), { access: "private", addRandomSuffix: false, allowOverwrite: false, contentType: "application/json", token: blobToken });
