@@ -1,0 +1,9 @@
+.next
+node_modules
+.vercel
+.env*
+coverage
+*.log
+*.tsbuildinfo
+lighthouse*.json
+extension/annotated-sidepanel.zip
