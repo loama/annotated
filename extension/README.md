@@ -12,7 +12,7 @@
 
 The extension opens as a native Chrome side panel. It reads only the active page when you click its toolbar icon. Click the icon again on another page to capture a new source. Selected text and media timing are passed directly into the annotation studio in your browser.
 
-The extension has access only to https://annotated-beta.vercel.app so the side panel can use your existing Annotated sign-in. Microphone access is requested by Chrome only when you choose to record audio commentary.
+The extension has host access only to https://annotated-beta.vercel.app. Its cookie permission reads only the Annotated session cookie so the side panel can use an existing Annotated sign-in. It has no host permission for YouTube cookies. Microphone access is requested by Chrome only when you choose to record audio commentary.
 
 When you publish a YouTube annotation, the extension asks you to confirm with a Start recording button that belongs to the extension itself. Annotated then records only the fully visible player area and tab audio for the selected range, up to 90 seconds. Keep the player visible and the side panel open until recording finishes. The recording stays in your browser until it is uploaded to Annotated for exact-range 240p encoding. No YouTube cookies are read or stored.
 
