@@ -63,7 +63,6 @@ iframe { width: 100%; height: 100%; border: 0; background: var(--paper); }
 .restricted-mark { width: 46px; height: 46px; display: grid; place-items: center; border-radius: 50%; background: var(--ink); color: white; font-weight: 700; }
 .restricted h1 { max-width: 250px; margin: 24px 0 10px; font-size: 28px; line-height: 0.98; letter-spacing: -0.065em; }
 .restricted p { max-width: 280px; margin: 0; color: var(--muted); font-size: 12px; line-height: 1.6; }
-.restricted button { margin-top: 25px; border: 0; border-radius: 999px; background: var(--accent); color: white; padding: 11px 18px; font-size: 12px; font-weight: 650; cursor: pointer; }
 
 @keyframes breathe {
   0% { transform: scale(0.72); opacity: 0.72; }

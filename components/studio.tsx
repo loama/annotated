@@ -30,6 +30,17 @@ import { encodeAnnotation } from "@/lib/encoding";
 import type { Annotation, SourceType, StudioDraft } from "@/lib/types";
 
 const steps = ["Source", "Select", "Comment", "Review"];
+type ExtensionCapture = {
+  sourceUrl: string;
+  sourceTitle?: string;
+  sourceType?: SourceType;
+  sourceImage?: string;
+  mediaUrl?: string;
+  selection?: string;
+  startSeconds?: number;
+  endSeconds?: number;
+};
+
 const sourceOptions: Array<{ type: SourceType; label: string; note: string; icon: typeof Play }> = [
   { type: "video", label: "Video", note: "YouTube or direct video", icon: Play },
   { type: "article", label: "Article", note: "News, essays, research", icon: Article },
@@ -109,6 +120,7 @@ export function Studio() {
   const router = useRouter();
   const { user, openSignIn } = useAuth();
   const fromExtension = searchParams.get("extension") === "1";
+  const extensionOrigin = searchParams.get("extensionOrigin") || "";
   const initialUrl = searchParams.get("source") || "";
   const initialType = (searchParams.get("type") as SourceType | null) || (initialUrl ? detectSourceType(initialUrl) : "video");
   const initialClip = clampClip(Number(searchParams.get("start")) || 0, Number(searchParams.get("end")) || 60);
@@ -145,6 +157,49 @@ export function Studio() {
   }, [recording]);
 
   useEffect(() => () => { if (recordedUrl) URL.revokeObjectURL(recordedUrl); }, [recordedUrl]);
+
+  useEffect(() => {
+    if (!fromExtension || !/^chrome-extension:\/\/[a-p]{32}$/.test(extensionOrigin)) return;
+
+    function receiveCapture(event: MessageEvent) {
+      if (event.source !== window.parent || event.origin !== extensionOrigin || event.data?.type !== "annotated:capture") return;
+      const capture = event.data.capture as ExtensionCapture | undefined;
+      if (!capture?.sourceUrl) return;
+      let parsedSource: URL;
+      try { parsedSource = new URL(capture.sourceUrl); }
+      catch { return; }
+      if (!/^https?:$/.test(parsedSource.protocol)) return;
+
+      const sourceType = capture.sourceType && ["video", "article", "podcast"].includes(capture.sourceType) ? capture.sourceType : detectSourceType(capture.sourceUrl);
+      const clip = clampClip(Number(capture.startSeconds) || 0, Number(capture.endSeconds) || 60);
+      const safeRemoteUrl = (value?: string) => {
+        if (!value) return "";
+        try { const parsed = new URL(value); return /^https?:$/.test(parsed.protocol) ? parsed.toString() : ""; }
+        catch { return ""; }
+      };
+      setDraft({
+        sourceUrl: parsedSource.toString(),
+        sourceTitle: String(capture.sourceTitle || "Untitled source").slice(0, 300),
+        sourcePublisher: sourceDomain(capture.sourceUrl),
+        sourceImage: safeRemoteUrl(capture.sourceImage),
+        sourceType,
+        mediaUrl: safeRemoteUrl(capture.mediaUrl),
+        selection: String(capture.selection || "").slice(0, 3000),
+        startSeconds: clip.startSeconds,
+        endSeconds: clip.endSeconds,
+        commentary: "",
+      });
+      setRecordedBlob(null);
+      setRecordedUrl((current) => { if (current) URL.revokeObjectURL(current); return null; });
+      setSourceError("");
+      setPublishError("");
+      setStep(1);
+    }
+
+    window.addEventListener("message", receiveCapture);
+    window.parent.postMessage({ type: "annotated:ready" }, extensionOrigin);
+    return () => window.removeEventListener("message", receiveCapture);
+  }, [extensionOrigin, fromExtension]);
 
   const canContinue = useMemo(() => {
     if (step === 0) return Boolean(draft.sourceUrl && !sourceError);

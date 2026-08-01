@@ -10,9 +10,6 @@
     <header>
       <div class="brand"><span class="mark">a</span><span>annotated</span></div>
       <div class="actions">
-        <button id="refresh" type="button" aria-label="Recapture current page" title="Recapture current page">
-          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 11a8.1 8.1 0 1 0-2.2 5.6M20 4v7h-7" /></svg>
-        </button>
         <button id="open" type="button" aria-label="Open Annotated in a tab" title="Open Annotated in a tab">
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14 5h5v5M19 5l-8 8M18 13v5a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5" /></svg>
         </button>
@@ -23,13 +20,12 @@
       <section id="loading" class="loading" aria-live="polite">
         <div class="pulse"><span></span></div>
         <p>Reading the current page</p>
-        <small>Selection, media, and source details stay in your browser.</small>
+        <small>Selection and media details move directly into your private draft.</small>
       </section>
       <section id="restricted" class="restricted" hidden>
         <span class="restricted-mark">a</span>
-        <h1>Open a page to annotate.</h1>
-        <p>Chrome system pages cannot be read. Switch to a video, article, or podcast, then recapture.</p>
-        <button id="retry" type="button">Try again</button>
+        <h1>Choose a page to annotate.</h1>
+        <p id="restricted-message">Click the Annotated toolbar icon on an article, video, or podcast to capture it.</p>
       </section>
       <iframe id="app" title="Annotated capture studio" hidden></iframe>
     </main>
