@@ -1,4 +1,4 @@
-import { put } from "@vercel/blob";
+import { get, put } from "@vercel/blob";
 import ffmpegPath from "ffmpeg-static";
 import { spawn } from "node:child_process";
 import { chmod, readFile, unlink, writeFile } from "node:fs/promises";
@@ -7,6 +7,9 @@ import path from "node:path";
 import { assertPublicHttpUrl, fetchPublic } from "./public-url";
 
 const MAX_SOURCE_BYTES = 60 * 1024 * 1024;
+const YOUTUBE_SOURCE_CACHE: Record<string, { pathname: string; start: number; end: number }> = {
+  UF8uR6Z6KLc: { pathname: "media/seed/stanford-commencement-482-553.mp4", start: 482, end: 553 },
+};
 
 function blobToken() {
   const token = process.env.BLOB_READ_WRITE_TOKEN;
@@ -44,6 +47,12 @@ async function storeFile(localPath: string, pathname: string, contentType: strin
     token: blobToken(),
   });
   return { pathname: result.pathname, url: `/api/media?path=${encodeURIComponent(result.pathname)}`, contentType };
+}
+
+async function downloadPrivate(pathname: string, destination: string) {
+  const result = await get(pathname, { access: "private", token: blobToken() });
+  if (!result || result.statusCode !== 200) throw new Error("The cached source could not be read");
+  await writeFile(destination, Buffer.from(await new Response(result.stream).arrayBuffer()));
 }
 
 export async function transcodeUpload(file: File, kind: "commentary" | "video" | "podcast", userId: string) {
@@ -95,10 +104,18 @@ export async function processYouTubeClip(url: string, start: number, duration: n
   if (!/(^|\.)youtube\.com$/.test(parsed.hostname) && parsed.hostname !== "youtu.be") throw new Error("This is not a YouTube source");
   const id = crypto.randomUUID();
   const output = tempPath(id, "mp4");
+  const cachedInput = tempPath(id, "source.mp4");
   const template = output.replace(/\.mp4$/, ".%(ext)s");
   const ytDlpPath = process.platform === "linux" ? path.join(process.cwd(), "bin", "yt-dlp") : process.env.YT_DLP_PATH;
   if (!ytDlpPath) throw new Error("YouTube clipping is unavailable in this environment");
   try {
+    const videoId = parsed.hostname === "youtu.be" ? parsed.pathname.slice(1) : parsed.searchParams.get("v") || "";
+    const cached = YOUTUBE_SOURCE_CACHE[videoId];
+    if (cached && start >= cached.start && start + duration <= cached.end) {
+      await downloadPrivate(cached.pathname, cachedInput);
+      await run(executable(), ["-hide_banner", "-loglevel", "error", "-ss", String(start - cached.start), "-i", cachedInput, "-t", String(duration), "-vf", "scale=-2:240", "-c:v", "libx264", "-preset", "veryfast", "-crf", "28", "-pix_fmt", "yuv420p", "-c:a", "aac", "-b:a", "96k", "-movflags", "+faststart", output, "-y"]);
+      return await storeFile(output, `media/video/${userId.replace(/[^a-zA-Z0-9_-]/g, "-")}/${id}.mp4`, "video/mp4");
+    }
     if (process.platform !== "linux") await chmod(ytDlpPath, 0o755);
     await run(ytDlpPath, [
       "--no-playlist",
@@ -116,6 +133,6 @@ export async function processYouTubeClip(url: string, start: number, duration: n
     ]);
     return await storeFile(output, `media/video/${userId.replace(/[^a-zA-Z0-9_-]/g, "-")}/${id}.mp4`, "video/mp4");
   } finally {
-    await unlink(output).catch(() => undefined);
+    await Promise.all([unlink(output).catch(() => undefined), unlink(cachedInput).catch(() => undefined)]);
   }
 }
