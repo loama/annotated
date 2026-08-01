@@ -5,7 +5,8 @@ Annotated is a source-first public notebook for the web. The Chrome side panel c
 ## Product requirements covered
 
 - Chrome side-panel extension as the primary capture surface
-- YouTube and video clips capped at 90 seconds and presented at 240p
+- YouTube moments recorded at 240p by the Chrome extension, with an official source-player fallback on the web
+- Direct video clips capped at 90 seconds and encoded at 240p
 - Article passage capture with publisher and source metadata
 - Podcast and audio excerpts capped at 90 seconds
 - Text and browser-recorded audio commentary
@@ -45,7 +46,7 @@ AUTH_SECRET=...
 NEXT_PUBLIC_GOOGLE_CLIENT_ID=...
 ```
 
-On macOS, set `YT_DLP_PATH` to a current local `yt-dlp` binary for YouTube clip development. Production uses the bundled Linux binary in `bin/yt-dlp`.
+YouTube annotations created from the extension use an explicit in-extension recording confirmation, capture only the visible player and tab audio for the selected range, and are encoded at 240p. The top-level web studio falls back to the official embedded player with validated start and end times. Annotated never asks for or stores YouTube browser cookies.
 
 ## Extension
 

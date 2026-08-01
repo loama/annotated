@@ -217,7 +217,7 @@ export function HomeFeed() {
             </div>
             <div className="divide-y divide-[var(--line)] md:col-span-7">
               {[
-                { icon: Play, title: "Video", body: "Mark up to 90 seconds. Every published excerpt plays at 240p and returns to the exact source." },
+                { icon: Play, title: "Video", body: "Mark up to 90 seconds. The Chrome extension records YouTube moments at 240p, with a source-player fallback on the web." },
                 { icon: Article, title: "Articles", body: "Highlight the sentence or passage that matters. Publisher, title, and source URL stay visible." },
                 { icon: Headphones, title: "Podcasts", body: "Capture up to 90 seconds of audio, then respond with text or your own recorded voice." },
               ].map((item, index) => (
