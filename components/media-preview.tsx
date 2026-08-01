@@ -3,7 +3,7 @@
 import { motion } from "framer-motion";
 import { Article, Headphones, Play } from "@phosphor-icons/react";
 import type { Annotation } from "@/lib/types";
-import { clipDuration, youtubeId } from "@/lib/rules";
+import { clipDuration, youtubeEmbedUrl, youtubeId, youtubeTimestampUrl } from "@/lib/rules";
 
 function formatTime(seconds = 0) {
   const minutes = Math.floor(seconds / 60);
@@ -12,6 +12,7 @@ function formatTime(seconds = 0) {
 
 export function MediaPreview({ annotation, interactive = false }: { annotation: Annotation; interactive?: boolean }) {
   const videoId = youtubeId(annotation.sourceUrl);
+  const embedUrl = youtubeEmbedUrl(annotation.sourceUrl, annotation.startSeconds || 0, annotation.endSeconds || 90);
   const duration = clipDuration(annotation.startSeconds || 0, annotation.endSeconds || 0);
 
   if (annotation.sourceType === "video") {
@@ -24,7 +25,17 @@ export function MediaPreview({ annotation, interactive = false }: { annotation: 
       );
     }
 
-    if (interactive && videoId) return <div className="relative aspect-video overflow-hidden rounded-[1.55rem] bg-[#20211f]"><iframe className="size-full" src={`https://www.youtube-nocookie.com/embed/${videoId}?start=${annotation.startSeconds || 0}&end=${annotation.endSeconds || 90}&rel=0&modestbranding=1`} title={annotation.sourceTitle} allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowFullScreen /></div>;
+    if (interactive && videoId) return (
+      <div className="rounded-[1.55rem] bg-[#20211f] p-3 text-white">
+        <div className="relative mx-auto aspect-video w-full max-w-[426px] overflow-hidden rounded-[1.1rem] bg-black">
+          <iframe className="size-full" src={embedUrl || undefined} title={`${annotation.sourceTitle}, selected moment`} allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowFullScreen />
+        </div>
+        <div className="flex flex-wrap items-center justify-between gap-3 px-2 pb-1 pt-3 text-xs">
+          <span className="font-mono text-[0.58rem] uppercase tracking-[0.12em] text-white/55">YouTube source · {formatTime(annotation.startSeconds)} to {formatTime(annotation.endSeconds)}</span>
+          <a href={youtubeTimestampUrl(annotation.sourceUrl, annotation.startSeconds || 0)} target="_blank" rel="noreferrer" className="font-semibold text-white/82 hover:text-white">Watch on YouTube</a>
+        </div>
+      </div>
+    );
 
     return (
       <div className="group relative aspect-[16/10] overflow-hidden rounded-[1.55rem] bg-[#20211f]">
@@ -38,7 +49,7 @@ export function MediaPreview({ annotation, interactive = false }: { annotation: 
             <p className="font-mono text-[0.58rem] uppercase tracking-[0.14em] text-white/64">Selected moment</p>
             <p className="mt-1 text-sm font-medium">{formatTime(annotation.startSeconds)} to {formatTime(annotation.endSeconds)}</p>
           </div>
-          <span className="rounded-full border border-white/18 bg-black/36 px-2.5 py-1 font-mono text-[0.58rem]">{duration}s · 240p</span>
+          <span className="rounded-full border border-white/18 bg-black/36 px-2.5 py-1 font-mono text-[0.58rem]">{duration}s · {videoId && !annotation.mediaUrl ? "YouTube" : "240p"}</span>
         </div>
       </div>
     );

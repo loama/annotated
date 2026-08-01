@@ -27,6 +27,7 @@ export type Annotation = {
   sourceImage?: string;
   mediaUrl?: string;
   mediaContentType?: string;
+  playbackMode?: "youtube" | "encoded";
   excerpt?: string;
   startSeconds?: number;
   endSeconds?: number;

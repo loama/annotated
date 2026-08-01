@@ -18,7 +18,7 @@ export function clipDuration(startSeconds: number, endSeconds: number) {
 
 export function detectSourceType(url: string): SourceType {
   const normalized = url.toLowerCase();
-  if (normalized.includes("youtube.com") || normalized.includes("youtu.be") || normalized.match(/\.(mp4|webm)(\?|$)/)) {
+  if (youtubeId(url) || normalized.match(/\.(mp4|webm)(\?|$)/)) {
     return "video";
   }
   if (normalized.includes("podcast") || normalized.includes("spotify.com/episode") || normalized.includes("podcasts.apple.com") || normalized.match(/\.(mp3|m4a|wav)(\?|$)/)) {
@@ -38,12 +38,39 @@ export function sourceDomain(url: string) {
 export function youtubeId(url: string) {
   try {
     const parsed = new URL(url);
-    if (parsed.hostname.includes("youtu.be")) return parsed.pathname.slice(1).split("/")[0] || null;
-    if (parsed.pathname.startsWith("/shorts/")) return parsed.pathname.split("/")[2] || null;
-    return parsed.searchParams.get("v");
+    const hostname = parsed.hostname.toLowerCase().replace(/^www\./, "");
+    const youtubeHost = hostname === "youtube.com" || hostname.endsWith(".youtube.com") || hostname === "youtube-nocookie.com" || hostname.endsWith(".youtube-nocookie.com");
+    const candidate = hostname === "youtu.be"
+      ? parsed.pathname.slice(1).split("/")[0]
+      : youtubeHost && parsed.pathname.startsWith("/shorts/")
+        ? parsed.pathname.split("/")[2]
+        : youtubeHost
+          ? parsed.searchParams.get("v")
+          : null;
+    return candidate && /^[a-zA-Z0-9_-]{11}$/.test(candidate) ? candidate : null;
   } catch {
     return null;
   }
+}
+
+export function youtubeTimestampUrl(url: string, startSeconds: number) {
+  const videoId = youtubeId(url);
+  if (!videoId) return url;
+  const target = new URL(`https://www.youtube.com/watch?v=${videoId}`);
+  target.searchParams.set("t", `${Math.max(0, Math.floor(startSeconds))}s`);
+  return target.toString();
+}
+
+export function youtubeEmbedUrl(url: string, startSeconds: number, endSeconds: number) {
+  const videoId = youtubeId(url);
+  if (!videoId) return null;
+  const clip = clampClip(startSeconds, endSeconds);
+  const target = new URL(`https://www.youtube-nocookie.com/embed/${videoId}`);
+  target.searchParams.set("start", String(clip.startSeconds));
+  target.searchParams.set("end", String(clip.endSeconds));
+  target.searchParams.set("rel", "0");
+  target.searchParams.set("playsinline", "1");
+  return target.toString();
 }
 
 export function makeAnnotationId(title: string) {

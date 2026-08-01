@@ -1,35 +1,15 @@
 import { get, list, put } from "@vercel/blob";
 import { NextRequest, NextResponse } from "next/server";
 import { seedAnnotations, seedComments } from "@/lib/data";
-import { MAX_CLIP_SECONDS, VIDEO_RESOLUTION } from "@/lib/rules";
 import type { Annotation } from "@/lib/types";
 import { readSession, SESSION_COOKIE } from "@/lib/auth";
 import { sessionAuthor } from "@/lib/identity";
+import { validAnnotation } from "@/lib/annotation-validation";
 
 export const dynamic = "force-dynamic";
 
 function token() {
   return process.env.BLOB_READ_WRITE_TOKEN;
-}
-
-function validAnnotation(value: unknown): value is Annotation {
-  if (!value || typeof value !== "object") return false;
-  const annotation = value as Annotation;
-  if (!annotation.id || !annotation.sourceUrl || !annotation.sourceTitle || !annotation.commentary || !annotation.author?.id) return false;
-  try { new URL(annotation.sourceUrl); } catch { return false; }
-  if (annotation.sourceType === "video") {
-    if (!annotation.mediaUrl?.startsWith("/api/media?path=media%2F")) return false;
-    if (annotation.resolution !== VIDEO_RESOLUTION) return false;
-    if (typeof annotation.startSeconds !== "number" || typeof annotation.endSeconds !== "number") return false;
-    if (annotation.endSeconds - annotation.startSeconds > MAX_CLIP_SECONDS || annotation.endSeconds <= annotation.startSeconds) return false;
-  }
-  if (annotation.sourceType === "podcast") {
-    if (!annotation.mediaUrl?.startsWith("/api/media?path=media%2F")) return false;
-    if (typeof annotation.startSeconds !== "number" || typeof annotation.endSeconds !== "number") return false;
-    if (annotation.endSeconds - annotation.startSeconds > MAX_CLIP_SECONDS || annotation.endSeconds <= annotation.startSeconds) return false;
-  }
-  if (annotation.sourceType === "article" && (!annotation.excerpt || annotation.excerpt.trim().length < 12)) return false;
-  return true;
 }
 
 async function dynamicAnnotations() {

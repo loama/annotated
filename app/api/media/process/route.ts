@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { readSession, SESSION_COOKIE } from "@/lib/auth";
-import { processDirectClip, processYouTubeClip } from "@/lib/media";
+import { processDirectClip } from "@/lib/media";
 import { clampClip, youtubeId } from "@/lib/rules";
 
 export const runtime = "nodejs";
@@ -16,10 +16,11 @@ export async function POST(request: NextRequest) {
   const clip = clampClip(Number(input.startSeconds), Number(input.endSeconds));
   const duration = clip.endSeconds - clip.startSeconds;
   try {
-    const result = input.sourceType === "video" && youtubeId(input.sourceUrl)
-      ? await processYouTubeClip(input.sourceUrl, clip.startSeconds, duration, user.id)
-      : await processDirectClip(input.mediaUrl || input.sourceUrl, clip.startSeconds, duration, input.sourceType, user.id);
-    return NextResponse.json(result, { status: 201 });
+    if (input.sourceType === "video" && youtubeId(input.sourceUrl)) {
+      return NextResponse.json({ playbackMode: "youtube" }, { status: 201 });
+    }
+    const result = await processDirectClip(input.mediaUrl || input.sourceUrl, clip.startSeconds, duration, input.sourceType, user.id);
+    return NextResponse.json({ ...result, playbackMode: "encoded" }, { status: 201 });
   } catch (reason) {
     return NextResponse.json({ error: reason instanceof Error ? reason.message : "Clip generation failed" }, { status: 422 });
   }

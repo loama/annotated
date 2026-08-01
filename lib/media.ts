@@ -1,16 +1,13 @@
-import { get, put } from "@vercel/blob";
+import { put } from "@vercel/blob";
 import ffmpegPath from "ffmpeg-static";
 import { spawn } from "node:child_process";
-import { chmod, readFile, unlink, writeFile } from "node:fs/promises";
+import { readFile, unlink, writeFile } from "node:fs/promises";
 import { existsSync } from "node:fs";
 import path from "node:path";
-import { assertPublicHttpUrl, fetchPublic } from "./public-url";
+import { fetchPublic } from "./public-url";
 
 const MAX_SOURCE_BYTES = 60 * 1024 * 1024;
-const YOUTUBE_SOURCE_CACHE: Record<string, { pathname: string; start: number; end: number }> = {
-  UF8uR6Z6KLc: { pathname: "media/seed/stanford-commencement-482-553.mp4", start: 482, end: 553 },
-};
-
+const MAX_UPLOAD_BYTES = 4_000_000;
 function blobToken() {
   const token = process.env.BLOB_READ_WRITE_TOKEN;
   if (!token) throw new Error("Media storage is unavailable");
@@ -38,6 +35,12 @@ function tempPath(id: string, extension: string) {
   return path.join("/tmp", `annotated-${id}-${crypto.randomUUID()}.${extension}`);
 }
 
+export function videoTranscodeArgs(input: string, output: string, trimStartSeconds = 0, durationSeconds = 90) {
+  const safeStart = Math.min(5, Math.max(0, Number.isFinite(trimStartSeconds) ? trimStartSeconds : 0));
+  const safeDuration = Math.min(90, Math.max(1, Number.isFinite(durationSeconds) ? durationSeconds : 90));
+  return ["-hide_banner", "-loglevel", "error", "-i", input, "-ss", safeStart.toFixed(3), "-t", safeDuration.toFixed(3), "-vf", "scale=-2:240", "-c:v", "libx264", "-preset", "veryfast", "-crf", "28", "-pix_fmt", "yuv420p", "-c:a", "aac", "-b:a", "96k", "-movflags", "+faststart", output, "-y"];
+}
+
 async function storeFile(localPath: string, pathname: string, contentType: string) {
   const result = await put(pathname, await readFile(localPath), {
     access: "private",
@@ -49,14 +52,8 @@ async function storeFile(localPath: string, pathname: string, contentType: strin
   return { pathname: result.pathname, url: `/api/media?path=${encodeURIComponent(result.pathname)}`, contentType };
 }
 
-async function downloadPrivate(pathname: string, destination: string) {
-  const result = await get(pathname, { access: "private", token: blobToken() });
-  if (!result || result.statusCode !== 200) throw new Error("The cached source could not be read");
-  await writeFile(destination, Buffer.from(await new Response(result.stream).arrayBuffer()));
-}
-
-export async function transcodeUpload(file: File, kind: "commentary" | "video" | "podcast", userId: string) {
-  if (file.size < 1 || file.size > MAX_SOURCE_BYTES) throw new Error("Media must be between 1 byte and 60 MB");
+export async function transcodeUpload(file: File, kind: "commentary" | "video" | "podcast", userId: string, options?: { trimStartSeconds?: number; durationSeconds?: number }) {
+  if (file.size < 1 || file.size > MAX_UPLOAD_BYTES) throw new Error("Uploads must be between 1 byte and 4 MB");
   const id = crypto.randomUUID();
   const input = tempPath(id, "input");
   const isVideo = kind === "video";
@@ -64,7 +61,7 @@ export async function transcodeUpload(file: File, kind: "commentary" | "video" |
   try {
     await writeFile(input, Buffer.from(await file.arrayBuffer()));
     const args = isVideo
-      ? ["-hide_banner", "-loglevel", "error", "-i", input, "-t", "90", "-vf", "scale=-2:240", "-c:v", "libx264", "-preset", "veryfast", "-crf", "28", "-pix_fmt", "yuv420p", "-c:a", "aac", "-b:a", "96k", "-movflags", "+faststart", output, "-y"]
+      ? videoTranscodeArgs(input, output, options?.trimStartSeconds, options?.durationSeconds)
       : ["-hide_banner", "-loglevel", "error", "-i", input, "-t", "90", "-vn", "-c:a", "libmp3lame", "-b:a", "96k", output, "-y"];
     await run(executable(), args);
     return await storeFile(output, `media/${kind}/${userId.replace(/[^a-zA-Z0-9_-]/g, "-")}/${id}.${isVideo ? "mp4" : "mp3"}`, isVideo ? "video/mp4" : "audio/mpeg");
@@ -96,43 +93,5 @@ export async function processDirectClip(url: string, start: number, duration: nu
     return await storeFile(output, `media/${type}/${userId.replace(/[^a-zA-Z0-9_-]/g, "-")}/${id}.${type === "video" ? "mp4" : "mp3"}`, type === "video" ? "video/mp4" : "audio/mpeg");
   } finally {
     await Promise.all([unlink(input).catch(() => undefined), unlink(output).catch(() => undefined)]);
-  }
-}
-
-export async function processYouTubeClip(url: string, start: number, duration: number, userId: string) {
-  const parsed = assertPublicHttpUrl(url);
-  if (!/(^|\.)youtube\.com$/.test(parsed.hostname) && parsed.hostname !== "youtu.be") throw new Error("This is not a YouTube source");
-  const id = crypto.randomUUID();
-  const output = tempPath(id, "mp4");
-  const cachedInput = tempPath(id, "source.mp4");
-  const template = output.replace(/\.mp4$/, ".%(ext)s");
-  const ytDlpPath = process.platform === "linux" ? path.join(process.cwd(), "bin", "yt-dlp") : process.env.YT_DLP_PATH;
-  if (!ytDlpPath) throw new Error("YouTube clipping is unavailable in this environment");
-  try {
-    const videoId = parsed.hostname === "youtu.be" ? parsed.pathname.slice(1) : parsed.searchParams.get("v") || "";
-    const cached = YOUTUBE_SOURCE_CACHE[videoId];
-    if (cached && start >= cached.start && start + duration <= cached.end) {
-      await downloadPrivate(cached.pathname, cachedInput);
-      await run(executable(), ["-hide_banner", "-loglevel", "error", "-ss", String(start - cached.start), "-i", cachedInput, "-t", String(duration), "-vf", "scale=-2:240", "-c:v", "libx264", "-preset", "veryfast", "-crf", "28", "-pix_fmt", "yuv420p", "-c:a", "aac", "-b:a", "96k", "-movflags", "+faststart", output, "-y"]);
-      return await storeFile(output, `media/video/${userId.replace(/[^a-zA-Z0-9_-]/g, "-")}/${id}.mp4`, "video/mp4");
-    }
-    if (process.platform !== "linux") await chmod(ytDlpPath, 0o755);
-    await run(ytDlpPath, [
-      "--no-playlist",
-      "--no-progress",
-      "--js-runtimes", "node",
-      "--extractor-args", "youtube:player_client=web_embedded",
-      "--download-sections", `*${start}-${start + duration}`,
-      "--force-keyframes-at-cuts",
-      "--format", "bestvideo[height<=240][ext=mp4]+bestaudio[ext=m4a]/best[height<=240][ext=mp4]",
-      "--merge-output-format", "mp4",
-      "--recode-video", "mp4",
-      "--ffmpeg-location", executable(),
-      "--output", template,
-      parsed.toString(),
-    ]);
-    return await storeFile(output, `media/video/${userId.replace(/[^a-zA-Z0-9_-]/g, "-")}/${id}.mp4`, "video/mp4");
-  } finally {
-    await Promise.all([unlink(output).catch(() => undefined), unlink(cachedInput).catch(() => undefined)]);
   }
 }
