@@ -31,13 +31,15 @@ async function captureTab(tab) {
           image: /^https?:/.test(image) ? image.slice(0, 2048) : "",
           audioSrc: audio?.currentSrc || audio?.src || "",
           mediaCurrentTime: Math.floor((video || audio)?.currentTime || 0),
+          mediaDuration: Number.isFinite((video || audio)?.duration) ? Math.floor((video || audio).duration) : 0,
           hasAudio: Boolean(audio),
         };
       },
     });
 
     const page = result?.result || {};
-    const startSeconds = Math.max(0, Number(page.mediaCurrentTime) || 0);
+    const detectedDuration = Math.max(0, Number(page.mediaDuration) || 0);
+    const startSeconds = Math.max(0, detectedDuration ? Math.min(detectedDuration - 1, Number(page.mediaCurrentTime) || 0) : Number(page.mediaCurrentTime) || 0);
     await storeCapture({
       sourceUrl: tab.url,
       sourceTitle: page.title || tab.title || "Untitled source",
@@ -46,7 +48,9 @@ async function captureTab(tab) {
       mediaUrl: page.audioSrc && !page.audioSrc.startsWith("blob:") ? page.audioSrc.slice(0, 2048) : "",
       selection: page.selection || "",
       startSeconds,
-      endSeconds: startSeconds + 60,
+      endSeconds: detectedDuration ? Math.min(detectedDuration, startSeconds + 60) : startSeconds + 60,
+      mediaDuration: detectedDuration,
+      tabId: tab.id,
       capturedAt: Date.now(),
     });
   } catch {

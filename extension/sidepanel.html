@@ -28,6 +28,16 @@
         <p id="restricted-message">Click the Annotated toolbar icon on an article, video, or podcast to capture it.</p>
       </section>
       <iframe id="app" title="Annotated capture studio" allow="microphone" hidden></iframe>
+      <section id="capture-confirm" class="capture-confirm" hidden aria-live="polite">
+        <div class="capture-card">
+          <span class="record-dot" aria-hidden="true"></span>
+          <p class="eyebrow">Ready to capture</p>
+          <h1>Keep the player visible.</h1>
+          <p>Annotated will play and record only the selected YouTube moment, then encode it at 240p. Keep this side panel open until it finishes.</p>
+          <button id="start-capture" type="button">Start recording</button>
+          <button id="cancel-capture" class="quiet-button" type="button">Cancel</button>
+        </div>
+      </section>
     </main>
     <script src="sidepanel.js"></script>
   </body>

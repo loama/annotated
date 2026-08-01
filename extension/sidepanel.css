@@ -49,7 +49,7 @@ header {
 .actions button:active { transform: translateY(1px) scale(0.96); }
 .actions svg { width: 17px; fill: none; stroke: currentColor; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
 
-main { height: calc(100% - 58px); }
+main { position: relative; height: calc(100% - 58px); }
 iframe { width: 100%; height: 100%; border: 0; background: var(--paper); }
 
 .loading, .restricted { height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 32px; text-align: center; }
@@ -63,6 +63,16 @@ iframe { width: 100%; height: 100%; border: 0; background: var(--paper); }
 .restricted-mark { width: 46px; height: 46px; display: grid; place-items: center; border-radius: 50%; background: var(--ink); color: white; font-weight: 700; }
 .restricted h1 { max-width: 250px; margin: 24px 0 10px; font-size: 28px; line-height: 0.98; letter-spacing: -0.065em; }
 .restricted p { max-width: 280px; margin: 0; color: var(--muted); font-size: 12px; line-height: 1.6; }
+
+.capture-confirm { position: absolute; z-index: 3; inset: 0; display: grid; place-items: center; padding: 22px; background: rgba(27, 28, 26, 0.52); backdrop-filter: blur(12px); }
+.capture-card { width: min(100%, 330px); padding: 28px; border: 1px solid rgba(255, 255, 255, 0.12); border-radius: 24px; background: var(--paper-bright); box-shadow: 0 28px 80px rgba(0, 0, 0, 0.24); text-align: left; }
+.record-dot { display: block; width: 10px; height: 10px; margin-bottom: 18px; border-radius: 50%; background: var(--accent); box-shadow: 0 0 0 6px rgba(204, 84, 57, 0.12); }
+.capture-card .eyebrow { margin: 0 0 8px; color: var(--accent); font-size: 10px; font-weight: 720; letter-spacing: 0.12em; text-transform: uppercase; }
+.capture-card h1 { margin: 0; font-size: 27px; line-height: 1; letter-spacing: -0.055em; }
+.capture-card > p:not(.eyebrow) { margin: 14px 0 22px; color: var(--muted); font-size: 12px; line-height: 1.6; }
+.capture-card button { width: 100%; min-height: 44px; border: 0; border-radius: 999px; background: var(--ink); color: white; font: inherit; font-size: 12px; font-weight: 680; cursor: pointer; }
+.capture-card button:disabled { cursor: wait; opacity: 0.62; }
+.capture-card .quiet-button { margin-top: 8px; background: transparent; color: var(--muted); }
 
 @keyframes breathe {
   0% { transform: scale(0.72); opacity: 0.72; }

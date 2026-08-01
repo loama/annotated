@@ -40,6 +40,8 @@ type ExtensionCapture = {
   selection?: string;
   startSeconds?: number;
   endSeconds?: number;
+  mediaDuration?: number;
+  tabId?: number;
 };
 
 const sourceOptions: Array<{ type: SourceType; label: string; note: string; icon: typeof Play }> = [
@@ -77,7 +79,7 @@ function StudioPreview({ draft }: { draft: StudioDraft }) {
       <div className="ink-core source-pattern relative flex h-full min-h-[25rem] flex-col overflow-hidden p-5 md:p-8">
         <div className="relative flex items-center justify-between">
           <span className="flex items-center gap-2 font-mono text-[0.57rem] uppercase tracking-[0.13em] text-white/52"><span className="size-1.5 rounded-full bg-[var(--accent)]" />Live preview</span>
-          <span className="rounded-full border border-white/10 px-2.5 py-1 font-mono text-[0.55rem] text-white/48">{draft.sourceType === "video" ? "240p" : draft.sourceType}</span>
+          <span className="rounded-full border border-white/10 px-2.5 py-1 font-mono text-[0.55rem] text-white/48">{draft.sourceType === "video" ? (video ? "YouTube" : "240p") : draft.sourceType}</span>
         </div>
 
         <div className="relative flex flex-1 flex-col justify-center py-9">
@@ -149,8 +151,15 @@ export function Studio() {
   const [recordedBlob, setRecordedBlob] = useState<Blob | null>(null);
   const [recordingSeconds, setRecordingSeconds] = useState(0);
   const [publishing, setPublishing] = useState(false);
+  const [capturingVideo, setCapturingVideo] = useState(false);
+  const [capturePhase, setCapturePhase] = useState<"waiting" | "recording" | "encoding" | null>(null);
+  const [captureSeconds, setCaptureSeconds] = useState(0);
+  const [captureTarget, setCaptureTarget] = useState(0);
   const [publishError, setPublishError] = useState("");
+  const [capturedTabId, setCapturedTabId] = useState<number | null>(null);
+  const [sourceDuration, setSourceDuration] = useState<number | null>(null);
   const mediaRecorder = useRef<MediaRecorder | null>(null);
+  const recordingTimeout = useRef<number | null>(null);
   const chunks = useRef<Blob[]>([]);
 
   useEffect(() => {
@@ -158,6 +167,12 @@ export function Studio() {
     const timer = window.setInterval(() => setRecordingSeconds((value) => value + 1), 1000);
     return () => window.clearInterval(timer);
   }, [recording]);
+
+  useEffect(() => {
+    if (capturePhase !== "recording") return;
+    const timer = window.setInterval(() => setCaptureSeconds((value) => Math.min(captureTarget, value + 1)), 1000);
+    return () => window.clearInterval(timer);
+  }, [capturePhase, captureTarget]);
 
   useEffect(() => () => { if (recordedUrl) URL.revokeObjectURL(recordedUrl); }, [recordedUrl]);
 
@@ -211,6 +226,8 @@ export function Studio() {
         endSeconds: clip.endSeconds,
         commentary: "",
       });
+      setCapturedTabId(Number.isInteger(capture.tabId) ? Number(capture.tabId) : null);
+      setSourceDuration(Number(capture.mediaDuration) > 0 ? Math.floor(Number(capture.mediaDuration)) : null);
       setRecordedBlob(null);
       setRecordedUrl((current) => { if (current) URL.revokeObjectURL(current); return null; });
       setSourceError("");
@@ -233,6 +250,8 @@ export function Studio() {
   function updateUrl(value: string) {
     setDraft((current) => ({ ...current, sourceUrl: value, sourceType: detectSourceType(value), sourceTitle: "", sourcePublisher: sourceDomain(value), sourceImage: "", mediaUrl: "", selection: "", commentary: "" }));
     setRecordedBlob(null);
+    setCapturedTabId(null);
+    setSourceDuration(null);
     if (recordedUrl) { URL.revokeObjectURL(recordedUrl); setRecordedUrl(null); }
     if (!value) setSourceError("");
     else {
@@ -260,13 +279,17 @@ export function Studio() {
     setDraft((current) => {
       const next = { ...current, [key]: value };
       const clamped = clampClip(next.startSeconds, next.endSeconds);
-      return { ...next, ...clamped };
+      if (!sourceDuration) return { ...next, ...clamped };
+      const endSeconds = Math.min(sourceDuration, clamped.endSeconds);
+      const startSeconds = Math.min(clamped.startSeconds, Math.max(0, endSeconds - 1));
+      return { ...next, startSeconds, endSeconds };
     });
   }
 
   async function toggleRecording() {
     if (recording) {
       mediaRecorder.current?.stop();
+      if (recordingTimeout.current) window.clearTimeout(recordingTimeout.current);
       setRecording(false);
       return;
     }
@@ -277,16 +300,22 @@ export function Studio() {
       if (!microphoneIsDelegated(document)) throw new DOMException("Microphone permission was not delegated", "SecurityError");
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       chunks.current = [];
-      const recorder = new MediaRecorder(stream);
+      const recorder = new MediaRecorder(stream, { audioBitsPerSecond: 48_000 });
       recorder.ondataavailable = (event) => event.data.size && chunks.current.push(event.data);
       recorder.onstop = () => {
+        if (recordingTimeout.current) window.clearTimeout(recordingTimeout.current);
+        recordingTimeout.current = null;
         const blob = new Blob(chunks.current, { type: recorder.mimeType || "audio/webm" });
         setRecordedBlob(blob);
         setRecordedUrl(URL.createObjectURL(blob));
         stream.getTracks().forEach((track) => track.stop());
       };
-      recorder.start();
+      recorder.start(1000);
       mediaRecorder.current = recorder;
+      recordingTimeout.current = window.setTimeout(() => {
+        if (recorder.state !== "inactive") recorder.stop();
+        setRecording(false);
+      }, 90_000);
       setRecordingSeconds(0);
       setRecording(true);
     } catch (reason) {
@@ -300,29 +329,97 @@ export function Studio() {
     window.open(`/studio?resume=${encodeURIComponent(key)}`, "_blank", "noopener,noreferrer");
   }
 
+  async function recordExtensionVideo() {
+    if (!fromExtension || !/^chrome-extension:\/\/[a-p]{32}$/.test(extensionOrigin)) throw new Error("Open this YouTube video from the Annotated extension before publishing.");
+    const requestId = crypto.randomUUID();
+    return await new Promise<{ blob: Blob; trimStartSeconds: number; durationSeconds: number }>((resolve, reject) => {
+      const timeout = window.setTimeout(() => {
+        window.parent.postMessage({ type: "annotated:cancel-video", requestId }, extensionOrigin);
+        finish(new Error("The video recording took too long. Keep the YouTube tab active and try again."));
+      }, (clipDuration(draft.startSeconds, draft.endSeconds) + 180) * 1000);
+      function finish(error?: Error, result?: { blob: Blob; trimStartSeconds: number; durationSeconds: number }) {
+        window.clearTimeout(timeout);
+        window.removeEventListener("message", receive);
+        if (error) reject(error);
+        else if (result) resolve(result);
+      }
+      async function receive(event: MessageEvent) {
+        if (event.source !== window.parent || event.origin !== extensionOrigin || event.data?.requestId !== requestId) return;
+        if (event.data.type === "annotated:video-error") finish(new Error(String(event.data.error || "Chrome could not record this video.")));
+        if (event.data.type === "annotated:video-recording") {
+          setCaptureSeconds(0);
+          setCapturePhase("recording");
+        }
+        if (event.data.type === "annotated:video-ready" && typeof event.data.dataUrl === "string") {
+          try {
+            const blob = await (await fetch(event.data.dataUrl)).blob();
+            finish(undefined, {
+              blob,
+              trimStartSeconds: Math.min(5, Math.max(0, Number(event.data.trimStartSeconds) || 0)),
+              durationSeconds: Math.min(90, Math.max(1, Number(event.data.durationSeconds) || clipDuration(draft.startSeconds, draft.endSeconds))),
+            });
+          }
+          catch { finish(new Error("The recorded video could not be prepared for upload.")); }
+        }
+      }
+      window.addEventListener("message", receive);
+      window.parent.postMessage({ type: "annotated:record-video", requestId, sourceUrl: draft.sourceUrl, tabId: capturedTabId, startSeconds: draft.startSeconds, endSeconds: draft.endSeconds }, extensionOrigin);
+    });
+  }
+
   async function publish() {
     if (!user) { openSignIn(); return; }
     setPublishing(true);
     setPublishError("");
     try {
+      const youtubeSource = draft.sourceType === "video" && Boolean(youtubeId(draft.sourceUrl));
+      let playbackMode: Annotation["playbackMode"] = youtubeSource && !fromExtension ? "youtube" : draft.sourceType === "article" ? undefined : "encoded";
       let mediaUrl = draft.mediaUrl.startsWith("/api/media") ? draft.mediaUrl : "";
-      let mediaContentType = draft.sourceType === "video" ? "video/mp4" : draft.sourceType === "podcast" ? "audio/mpeg" : undefined;
-      if (draft.sourceType !== "article" && !mediaUrl) {
+      let mediaContentType = youtubeSource && !fromExtension ? undefined : draft.sourceType === "video" ? "video/mp4" : draft.sourceType === "podcast" ? "audio/mpeg" : undefined;
+      if (youtubeSource && fromExtension && !mediaUrl) {
+        const target = clipDuration(draft.startSeconds, draft.endSeconds);
+        setCapturingVideo(true);
+        setCaptureSeconds(0);
+        setCaptureTarget(target);
+        setCapturePhase("waiting");
+        try {
+          const captured = await recordExtensionVideo();
+          setCapturePhase("encoding");
+          const form = new FormData();
+          form.set("kind", "video");
+          form.set("file", new File([captured.blob], "youtube-moment.webm", { type: captured.blob.type || "video/webm" }));
+          form.set("trimStartSeconds", String(captured.trimStartSeconds));
+          form.set("durationSeconds", String(captured.durationSeconds));
+          const response = await fetch("/api/media/upload", { method: "POST", body: form });
+          const payload = await response.json().catch(() => ({})) as { url?: string; contentType?: string; error?: string };
+          if (!response.ok || !payload.url) throw new Error(payload.error || "The recorded video could not be encoded.");
+          mediaUrl = payload.url;
+          mediaContentType = payload.contentType;
+          playbackMode = "encoded";
+          setDraft((current) => ({ ...current, mediaUrl }));
+        } finally {
+          setCapturingVideo(false);
+          setCapturePhase(null);
+        }
+      }
+      if (draft.sourceType !== "article" && !youtubeSource && !mediaUrl) {
         const response = await fetch("/api/media/process", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ sourceUrl: draft.sourceUrl, mediaUrl: draft.mediaUrl, sourceType: draft.sourceType, startSeconds: draft.startSeconds, endSeconds: draft.endSeconds }) });
-        const payload = await response.json() as { url?: string; contentType?: string; error?: string };
+        const payload = await response.json() as { url?: string; contentType?: string; playbackMode?: Annotation["playbackMode"]; error?: string };
         if (!response.ok || !payload.url) throw new Error(payload.error || "Clip generation failed");
         mediaUrl = payload.url;
         mediaContentType = payload.contentType;
+        playbackMode = payload.playbackMode || "encoded";
         setDraft((current) => ({ ...current, mediaUrl }));
       }
 
       let audioCommentaryUrl: string | undefined;
       if (recordedBlob) {
+        if (recordedBlob.size > 4_000_000) throw new Error("Audio commentary is too large to upload. Record a shorter note and try again.");
         const form = new FormData();
         form.set("kind", "commentary");
         form.set("file", new File([recordedBlob], "commentary.webm", { type: recordedBlob.type || "audio/webm" }));
         const response = await fetch("/api/media/upload", { method: "POST", body: form });
-        const payload = await response.json() as { url?: string; error?: string };
+        const payload = await response.json().catch(() => ({})) as { url?: string; error?: string };
         if (!response.ok || !payload.url) throw new Error(payload.error || "Audio commentary upload failed");
         audioCommentaryUrl = payload.url;
       }
@@ -339,16 +436,17 @@ export function Studio() {
         excerpt: draft.sourceType === "article" ? draft.selection : undefined,
         mediaUrl: mediaUrl || undefined,
         mediaContentType,
+        playbackMode,
         startSeconds: draft.sourceType !== "article" ? draft.startSeconds : undefined,
         endSeconds: draft.sourceType !== "article" ? draft.endSeconds : undefined,
-        resolution: draft.sourceType === "video" ? VIDEO_RESOLUTION : undefined,
+        resolution: draft.sourceType === "video" && playbackMode === "encoded" ? VIDEO_RESOLUTION : undefined,
         commentary: draft.commentary || "Audio commentary attached to this source.",
         audioCommentaryUrl,
         createdAt: new Date().toISOString(),
         author: sessionAuthor(user),
         applause: 0,
         commentCount: 0,
-        tags: draft.sourceType === "video" ? ["video", "240p"] : draft.sourceType === "podcast" ? ["audio", "90 seconds or less"] : ["reading", "source-linked"],
+        tags: youtubeSource ? ["video", playbackMode === "encoded" ? "encoded 240p" : "YouTube moment", "90 seconds or less"] : draft.sourceType === "video" ? ["video", "encoded 240p"] : draft.sourceType === "podcast" ? ["audio", "90 seconds or less"] : ["reading", "source-linked"],
       };
       const response = await fetch("/api/annotations", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(annotation) });
       const payload = await response.json() as { error?: string };
@@ -408,7 +506,7 @@ export function Studio() {
                     <>
                       <span className="eyebrow">Mark the part that matters</span>
                       <h1 className="mt-6 max-w-[12ch] text-4xl font-medium leading-[0.98] tracking-[-0.065em] md:text-6xl">Choose the exact {draft.sourceType === "article" ? "passage" : "moment"}.</h1>
-                      <p className="mt-5 max-w-[48ch] text-sm leading-relaxed text-[var(--ink-muted)]">{draft.sourceType === "article" ? "Keep enough surrounding language for the quote to remain fair and legible." : "Clips are capped at 90 seconds. Video is presented at 240p to keep the annotation lightweight and source-first."}</p>
+                      <p className="mt-5 max-w-[48ch] text-sm leading-relaxed text-[var(--ink-muted)]">{draft.sourceType === "article" ? "Keep enough surrounding language for the quote to remain fair and legible." : draft.sourceType === "video" && youtubeId(draft.sourceUrl) ? fromExtension ? "YouTube moments are capped at 90 seconds. Keep the player visible while the extension records and encodes the selected moment at 240p." : "YouTube moments are capped at 90 seconds and play from the original source." : "Clips are capped at 90 seconds. Direct video is encoded at 240p to keep the annotation lightweight and source-first."}</p>
 
                       {draft.sourceType === "article" ? (
                         <label className="mt-10 block flex-1">
@@ -423,14 +521,14 @@ export function Studio() {
                             <span className={`rounded-full px-3 py-1.5 font-mono text-[0.6rem] ${clipDuration(draft.startSeconds, draft.endSeconds) === 90 ? "bg-[var(--accent)] text-white" : "bg-[var(--paper-deep)]"}`}>{clipDuration(draft.startSeconds, draft.endSeconds)} / 90s</span>
                           </div>
                           <div className="mt-10 space-y-8">
-                            <div><div className="mb-3 flex justify-between font-mono text-[0.6rem] text-[var(--ink-muted)]"><span>Start</span><span>{formatTime(draft.startSeconds)}</span></div><input aria-label="Clip start" type="range" min={0} max={1200} value={draft.startSeconds} onChange={(event) => setClip("startSeconds", Number(event.target.value))} className="range-track w-full appearance-none" /></div>
-                            <div><div className="mb-3 flex justify-between font-mono text-[0.6rem] text-[var(--ink-muted)]"><span>End</span><span>{formatTime(draft.endSeconds)}</span></div><input aria-label="Clip end" type="range" min={1} max={1290} value={draft.endSeconds} onChange={(event) => setClip("endSeconds", Number(event.target.value))} className="range-track w-full appearance-none" /></div>
+                            <div><div className="mb-3 flex justify-between font-mono text-[0.6rem] text-[var(--ink-muted)]"><span>Start</span><span>{formatTime(draft.startSeconds)}</span></div><input aria-label="Clip start" type="range" min={0} max={sourceDuration || 1200} value={draft.startSeconds} onChange={(event) => setClip("startSeconds", Number(event.target.value))} className="range-track w-full appearance-none" /></div>
+                            <div><div className="mb-3 flex justify-between font-mono text-[0.6rem] text-[var(--ink-muted)]"><span>End</span><span>{formatTime(draft.endSeconds)}</span></div><input aria-label="Clip end" type="range" min={1} max={sourceDuration || 1290} value={draft.endSeconds} onChange={(event) => setClip("endSeconds", Number(event.target.value))} className="range-track w-full appearance-none" /></div>
                           </div>
                           <div className="mt-10 grid grid-cols-2 gap-3">
-                            <label><span className="mb-2 block text-[0.65rem] font-semibold">Starts at</span><input type="number" min={0} value={draft.startSeconds} onChange={(event) => setClip("startSeconds", Number(event.target.value))} className="w-full rounded-xl border border-[var(--line)] bg-white/45 px-4 py-3 font-mono text-sm outline-none focus:border-[var(--ink)]" /></label>
-                            <label><span className="mb-2 block text-[0.65rem] font-semibold">Ends at</span><input type="number" min={1} value={draft.endSeconds} onChange={(event) => setClip("endSeconds", Number(event.target.value))} className="w-full rounded-xl border border-[var(--line)] bg-white/45 px-4 py-3 font-mono text-sm outline-none focus:border-[var(--ink)]" /></label>
+                            <label><span className="mb-2 block text-[0.65rem] font-semibold">Starts at</span><input type="number" min={0} max={sourceDuration || undefined} value={draft.startSeconds} onChange={(event) => setClip("startSeconds", Number(event.target.value))} className="w-full rounded-xl border border-[var(--line)] bg-white/45 px-4 py-3 font-mono text-sm outline-none focus:border-[var(--ink)]" /></label>
+                            <label><span className="mb-2 block text-[0.65rem] font-semibold">Ends at</span><input type="number" min={1} max={sourceDuration || undefined} value={draft.endSeconds} onChange={(event) => setClip("endSeconds", Number(event.target.value))} className="w-full rounded-xl border border-[var(--line)] bg-white/45 px-4 py-3 font-mono text-sm outline-none focus:border-[var(--ink)]" /></label>
                           </div>
-                          <div className="mt-6 flex items-start gap-2 rounded-xl bg-[var(--paper-deep)]/65 p-3 text-[0.65rem] leading-relaxed text-[var(--ink-muted)]"><Check size={14} weight="bold" className="mt-0.5 shrink-0 text-[var(--accent)]" /><span>{draft.sourceType === "video" ? "Publishing generates a new H.264 asset at exactly 240 pixels high, with this selected range only." : draft.mediaUrl ? "Original episode audio detected. Publishing creates a playable excerpt with this selected range only." : "Open this episode in the Chrome side panel so Annotated can detect its original audio stream."}</span></div>
+                          <div className="mt-6 flex items-start gap-2 rounded-xl bg-[var(--paper-deep)]/65 p-3 text-[0.65rem] leading-relaxed text-[var(--ink-muted)]"><Check size={14} weight="bold" className="mt-0.5 shrink-0 text-[var(--accent)]" /><span>{draft.sourceType === "video" ? (youtubeId(draft.sourceUrl) ? (fromExtension ? "Publishing records this selected moment from the open YouTube tab in real time, then encodes it at 240p." : "This moment plays from the original YouTube source at the selected start and end times.") : "Publishing generates a new H.264 asset at exactly 240 pixels high, with this selected range only.") : draft.mediaUrl ? "Original episode audio detected. Publishing creates a playable excerpt with this selected range only." : "Open this episode in the Chrome side panel so Annotated can detect its original audio stream."}</span></div>
                         </div>
                       )}
                     </>
@@ -457,7 +555,7 @@ export function Studio() {
                         <div className="mt-6 flex flex-1 flex-col items-center justify-center rounded-[1.5rem] border border-[var(--line)] bg-white/30 p-8 text-center">
                           <button disabled={requestingMicrophone} onClick={toggleRecording} className={`pressable relative grid size-20 place-items-center rounded-full disabled:opacity-55 ${recording ? "recording-dot bg-[var(--accent)] text-white" : "bg-[var(--ink)] text-white"}`} aria-label={recording ? "Stop recording" : requestingMicrophone ? "Waiting for microphone permission" : "Start recording"}>{recording ? <Stop size={22} weight="fill" /> : <Microphone size={24} weight="light" />}</button>
                           <p className="mt-6 text-lg font-medium tracking-[-0.04em]">{requestingMicrophone ? "Allow microphone access" : recording ? "Recording your thought" : recordedUrl ? "Your voice note is ready" : "Record audio commentary"}</p>
-                          <p className="mt-2 font-mono text-[0.62rem] text-[var(--ink-muted)]">{requestingMicrophone ? "Use the browser prompt to continue" : recording ? `${formatTime(recordingSeconds)} · tap to finish` : "Your recording is uploaded only when you publish"}</p>
+                          <p className="mt-2 font-mono text-[0.62rem] text-[var(--ink-muted)]">{requestingMicrophone ? "Use the browser prompt to continue" : recording ? `${formatTime(recordingSeconds)} / 1:30 · tap to finish` : "Up to 90 seconds, uploaded only when you publish"}</p>
                           {recordedUrl && !recording && <audio controls src={recordedUrl} className="mt-6 w-full max-w-sm" />}
                           {microphoneError && (
                             <div role="alert" className="mt-6 max-w-md rounded-xl bg-[var(--accent)]/8 px-4 py-3 text-left text-xs leading-relaxed text-[var(--accent)]">
@@ -480,7 +578,7 @@ export function Studio() {
                       <div className="mt-10 divide-y divide-[var(--line)] border-y border-[var(--line)]">
                         {[
                           { label: "Source", value: draft.sourceTitle || "Untitled source", icon: LinkSimple },
-                          { label: "Excerpt", value: draft.sourceType === "article" ? `${draft.selection.length} characters` : `${clipDuration(draft.startSeconds, draft.endSeconds)} seconds${draft.sourceType === "video" ? " at 240p" : ""}`, icon: draft.sourceType === "article" ? Article : Waveform },
+                          { label: "Excerpt", value: draft.sourceType === "article" ? `${draft.selection.length} characters` : `${clipDuration(draft.startSeconds, draft.endSeconds)} seconds${draft.sourceType === "video" ? (youtubeId(draft.sourceUrl) ? " from YouTube" : " at 240p") : ""}`, icon: draft.sourceType === "article" ? Article : Waveform },
                           { label: "Commentary", value: recordedUrl ? "Recorded audio and text" : `${draft.commentary.length} characters`, icon: recordedUrl ? Microphone : TextT },
                           { label: "Source link", value: "Always visible", icon: Check },
                         ].map((item) => <div key={item.label} className="grid grid-cols-[auto_1fr] gap-4 py-5"><span className="grid size-10 place-items-center rounded-full bg-[var(--paper-deep)]"><item.icon size={17} weight="light" /></span><div><span className="block font-mono text-[0.55rem] uppercase tracking-[0.12em] text-[var(--ink-muted)]">{item.label}</span><span className="mt-1 block truncate text-sm font-medium">{item.value}</span></div></div>)}
@@ -500,7 +598,7 @@ export function Studio() {
                   </button>
                 ) : (
                   <button disabled={publishing} onClick={publish} className="pressable group flex items-center gap-3 rounded-full bg-[var(--accent)] py-2 pl-5 pr-2 text-sm font-semibold text-white disabled:opacity-55">
-                    {publishing ? (draft.sourceType === "article" ? "Publishing" : "Generating clip") : "Publish annotation"}
+                    {publishing ? (capturingVideo ? capturePhase === "waiting" ? "Confirm recording" : capturePhase === "recording" ? `Recording ${formatTime(captureSeconds)} / ${formatTime(captureTarget)}` : "Encoding 240p clip" : draft.sourceType === "article" || (youtubeId(draft.sourceUrl) && !fromExtension) ? "Publishing" : "Generating clip") : "Publish annotation"}
                     <span className="grid size-9 place-items-center rounded-full bg-white/14"><ArrowUpRight size={16} weight="light" /></span>
                   </button>
                 )}
