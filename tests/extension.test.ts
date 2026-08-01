@@ -71,4 +71,43 @@ describe("Chrome extension capture", () => {
     expect(manifest.permissions).toEqual(["activeTab", "scripting", "sidePanel", "storage"]);
     expect(manifest.host_permissions).toBeUndefined();
   });
+
+  test("reveals a frame that becomes ready before its capture arrives", async () => {
+    const source = await Bun.file(new URL("../extension/sidepanel.js", import.meta.url)).text();
+    const elementListeners = new Map<string, Array<() => void>>();
+    const windowListeners = new Map<string, Array<(event: unknown) => void>>();
+    const storageListeners: Array<(changes: Record<string, { newValue?: unknown }>, areaName: string) => void> = [];
+    const posted: unknown[] = [];
+    const contentWindow = { postMessage(message: unknown) { posted.push(message); } };
+    const elements: Record<string, { hidden: boolean; textContent?: string; src?: string; contentWindow?: typeof contentWindow; addEventListener: (name: string, listener: () => void) => void }> = {};
+    for (const id of ["app", "loading", "restricted", "restricted-message", "open"]) {
+      elements[id] = {
+        hidden: id === "restricted" || id === "app",
+        contentWindow: id === "app" ? contentWindow : undefined,
+        addEventListener(name, listener) { elementListeners.set(`${id}:${name}`, [...(elementListeners.get(`${id}:${name}`) || []), listener]); },
+      };
+    }
+    const chrome = {
+      runtime: { getURL() { return "chrome-extension://abcdefghijklmnopabcdefghijklmnop/"; } },
+      tabs: { create() {} },
+      storage: {
+        session: { async get() { return {}; } },
+        onChanged: { addListener(listener: (changes: Record<string, { newValue?: unknown }>, areaName: string) => void) { storageListeners.push(listener); } },
+      },
+    };
+    const document = { getElementById(id: string) { return elements[id]; } };
+    const window = { addEventListener(name: string, listener: (event: unknown) => void) { windowListeners.set(name, [...(windowListeners.get(name) || []), listener]); } };
+
+    new Function("chrome", "document", "window", source)(chrome, document, window);
+    await Promise.resolve();
+    elementListeners.get("app:load")?.forEach((listener) => listener());
+    expect(elements.app.hidden).toBe(true);
+
+    const capture = { sourceUrl: "https://example.com", sourceTitle: "Example", sourceType: "article", startSeconds: 0, endSeconds: 60 };
+    storageListeners.forEach((listener) => listener({ annotatedCapture: { newValue: capture } }, "session"));
+
+    expect(elements.app.hidden).toBe(false);
+    expect(elements.loading.hidden).toBe(true);
+    expect(posted).toContainEqual({ type: "annotated:capture", capture });
+  });
 });
