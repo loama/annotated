@@ -32,7 +32,7 @@ export function MediaPreview({ annotation, interactive = false }: { annotation: 
 
     return (
       <div className="group relative aspect-[16/10] overflow-hidden rounded-[1.55rem] bg-[#20211f]">
-        {annotation.sourceImage && <img src={annotation.sourceImage} alt="" className="size-full object-cover opacity-76 transition-transform duration-1000 ease-[cubic-bezier(0.32,0.72,0,1)] group-hover:scale-[1.035]" />}
+        {annotation.sourceImage && <img src={annotation.sourceImage} alt="" loading="lazy" decoding="async" className="size-full object-cover opacity-76 transition-transform duration-1000 ease-[cubic-bezier(0.32,0.72,0,1)] group-hover:scale-[1.035]" />}
         <div className="absolute inset-0 bg-gradient-to-t from-black/72 via-black/5 to-transparent" />
         <motion.span whileHover={{ scale: 1.08 }} whileTap={{ scale: 0.96 }} className="absolute left-5 top-5 grid size-12 place-items-center rounded-full border border-white/20 bg-black/42 text-white backdrop-blur-xl">
           <Play size={17} weight="fill" />
@@ -70,7 +70,7 @@ export function MediaPreview({ annotation, interactive = false }: { annotation: 
 
   return (
     <div className="relative overflow-hidden rounded-[1.55rem] bg-[#ddd5c8] p-6 md:p-8">
-      {annotation.sourceImage && <img src={annotation.sourceImage} alt="" className="absolute inset-0 size-full object-cover opacity-15 mix-blend-multiply" />}
+      {annotation.sourceImage && <img src={annotation.sourceImage} alt="" loading="lazy" decoding="async" className="absolute inset-0 size-full object-cover opacity-15 mix-blend-multiply" />}
       <div className="relative">
         <div className="mb-8 flex items-center justify-between">
           <span className="grid size-10 place-items-center rounded-full bg-[var(--paper-bright)]"><Article size={18} weight="light" /></span>
