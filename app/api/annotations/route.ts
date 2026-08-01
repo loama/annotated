@@ -2,7 +2,7 @@ import { get, list, put } from "@vercel/blob";
 import { NextRequest, NextResponse } from "next/server";
 import { seedAnnotations, seedComments } from "@/lib/data";
 import type { Annotation } from "@/lib/types";
-import { readSession, SESSION_COOKIE } from "@/lib/auth";
+import { readRequestSession } from "@/lib/auth";
 import { sessionAuthor } from "@/lib/identity";
 import { validAnnotation } from "@/lib/annotation-validation";
 
@@ -61,7 +61,7 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
-  const user = await readSession(request.cookies.get(SESSION_COOKIE)?.value);
+  const user = await readRequestSession(request);
   if (!user) return NextResponse.json({ error: "Sign in with Google to publish annotations" }, { status: 401 });
   let payload: unknown;
   try { payload = await request.json(); }

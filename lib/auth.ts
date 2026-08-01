@@ -45,4 +45,10 @@ export async function readSession(value?: string | null): Promise<SessionUser | 
   }
 }
 
+export async function readRequestSession(request: { headers: { get(name: string): string | null }; cookies: { get(name: string): { value: string } | undefined } }) {
+  const authorization = request.headers.get("authorization") || "";
+  const bearer = authorization.startsWith("Bearer ") ? authorization.slice(7).trim() : "";
+  return readSession(bearer || request.cookies.get(SESSION_COOKIE)?.value);
+}
+
 export const sessionMaxAge = SESSION_SECONDS;

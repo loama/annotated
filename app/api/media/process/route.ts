@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { readSession, SESSION_COOKIE } from "@/lib/auth";
+import { readRequestSession } from "@/lib/auth";
 import { processDirectClip } from "@/lib/media";
 import { clampClip, youtubeId } from "@/lib/rules";
 
@@ -7,7 +7,7 @@ export const runtime = "nodejs";
 export const maxDuration = 120;
 
 export async function POST(request: NextRequest) {
-  const user = await readSession(request.cookies.get(SESSION_COOKIE)?.value);
+  const user = await readRequestSession(request);
   if (!user) return NextResponse.json({ error: "Sign in with Google to generate clips" }, { status: 401 });
   let input: { sourceUrl?: string; mediaUrl?: string; sourceType?: "video" | "podcast"; startSeconds?: number; endSeconds?: number };
   try { input = await request.json(); }

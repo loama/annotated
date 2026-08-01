@@ -1,5 +1,5 @@
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
-import { createSession, readSession } from "../lib/auth";
+import { createSession, readRequestSession, readSession } from "../lib/auth";
 
 const previousSecret = process.env.AUTH_SECRET;
 
@@ -27,4 +27,14 @@ describe("signed sessions", () => {
   test("rejects malformed sessions", async () => {
     expect(await readSession("not-a-session")).toBeNull();
   });
+
+  test("accepts a signed bearer session from the extension", async () => {
+    const session = await createSession(user);
+    const request = {
+      headers: { get: (name: string) => name === "authorization" ? `Bearer ${session}` : null },
+      cookies: { get: () => undefined },
+    };
+    expect(await readRequestSession(request)).toEqual(user);
+  });
+
 });

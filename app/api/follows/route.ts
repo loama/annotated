@@ -1,6 +1,6 @@
 import { del, get, list, put } from "@vercel/blob";
 import { NextRequest, NextResponse } from "next/server";
-import { readSession, SESSION_COOKIE } from "@/lib/auth";
+import { readRequestSession } from "@/lib/auth";
 import { sessionAuthor } from "@/lib/identity";
 
 export const dynamic = "force-dynamic";
@@ -23,7 +23,7 @@ export async function GET(request: NextRequest) {
   if (!authorId) return NextResponse.json({ error: "authorId is required" }, { status: 400 });
   const blobToken = token();
   if (!blobToken) return NextResponse.json({ following: false, followerCount: 0, persisted: false });
-  const user = await readSession(request.cookies.get(SESSION_COOKIE)?.value);
+  const user = await readRequestSession(request);
   const pathname = user ? `follows/${safe(user.id)}/${safe(authorId)}.json` : "";
   const [follow, count] = await Promise.all([
     pathname ? get(pathname, { access: "private", useCache: false, token: blobToken }).catch(() => null) : Promise.resolve(null),
@@ -33,7 +33,7 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
-  const user = await readSession(request.cookies.get(SESSION_COOKIE)?.value);
+  const user = await readRequestSession(request);
   if (!user) return NextResponse.json({ error: "Sign in with Google to follow people" }, { status: 401 });
   let authorId = "";
   try { authorId = String((await request.json() as { authorId?: string }).authorId || ""); }

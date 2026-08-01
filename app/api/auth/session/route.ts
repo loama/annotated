@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createSession, readSession, SESSION_COOKIE, sessionMaxAge } from "@/lib/auth";
+import { createSession, readRequestSession, SESSION_COOKIE, sessionMaxAge } from "@/lib/auth";
 import type { SessionUser } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
@@ -16,7 +16,7 @@ type GoogleTokenInfo = {
 };
 
 export async function GET(request: NextRequest) {
-  const user = await readSession(request.cookies.get(SESSION_COOKIE)?.value);
+  const user = await readRequestSession(request);
   return NextResponse.json({ user });
 }
 

@@ -1,12 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
-import { readSession, SESSION_COOKIE } from "@/lib/auth";
+import { readRequestSession } from "@/lib/auth";
 import { transcodeUpload } from "@/lib/media";
 
 export const runtime = "nodejs";
 export const maxDuration = 120;
 
 export async function POST(request: NextRequest) {
-  const user = await readSession(request.cookies.get(SESSION_COOKIE)?.value);
+  const user = await readRequestSession(request);
   if (!user) return NextResponse.json({ error: "Sign in with Google to upload media" }, { status: 401 });
   const form = await request.formData();
   const file = form.get("file");

@@ -1,7 +1,7 @@
 import { get, list, put } from "@vercel/blob";
 import { NextRequest, NextResponse } from "next/server";
 import { seedComments } from "@/lib/data";
-import { readSession, SESSION_COOKIE } from "@/lib/auth";
+import { readRequestSession } from "@/lib/auth";
 import { sessionAuthor } from "@/lib/identity";
 import type { Comment } from "@/lib/types";
 
@@ -31,7 +31,7 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
-  const user = await readSession(request.cookies.get(SESSION_COOKIE)?.value);
+  const user = await readRequestSession(request);
   if (!user) return NextResponse.json({ error: "Sign in with Google to comment" }, { status: 401 });
   let input: Pick<Comment, "id" | "annotationId" | "body">;
   try { input = await request.json() as Pick<Comment, "id" | "annotationId" | "body">; }
