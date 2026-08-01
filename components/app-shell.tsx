@@ -5,7 +5,7 @@ import { AnimatePresence, motion } from "framer-motion";
 import { ArrowUpRight, DownloadSimple, List, Plus, X } from "@phosphor-icons/react";
 import { usePathname } from "next/navigation";
 import { useState } from "react";
-import { SignInSheet } from "./sign-in-sheet";
+import { useAuth } from "./auth-provider";
 
 const navItems = [
   { href: "/", label: "Discover" },
@@ -15,7 +15,7 @@ const navItems = [
 export function AppShell({ children, compact = false, embedded = false }: { children: React.ReactNode; compact?: boolean; embedded?: boolean }) {
   const pathname = usePathname();
   const [menuOpen, setMenuOpen] = useState(false);
-  const [signInOpen, setSignInOpen] = useState(false);
+  const { user, loading, openSignIn, signOut } = useAuth();
 
   return (
     <>
@@ -51,9 +51,7 @@ export function AppShell({ children, compact = false, embedded = false }: { chil
                 Extension
               </a>
             )}
-            <button onClick={() => setSignInOpen(true)} className="pressable hidden rounded-full border border-[var(--line)] px-3.5 py-2 text-xs font-medium sm:block">
-              Sign in
-            </button>
+            {!loading && (user ? <button onClick={signOut} className="pressable hidden items-center gap-2 rounded-full border border-[var(--line)] py-1.5 pl-1.5 pr-3 text-xs font-medium sm:flex">{user.picture ? <img src={user.picture} alt="" className="size-6 rounded-full" /> : <span className="grid size-6 place-items-center rounded-full bg-[var(--ink)] text-[0.55rem] text-white">{user.name.slice(0, 1)}</span>}<span className="max-w-24 truncate">{user.name.split(" ")[0]}</span></button> : <button onClick={openSignIn} className="pressable hidden rounded-full border border-[var(--line)] px-3.5 py-2 text-xs font-medium sm:block">Sign in</button>)}
             <Link href="/studio" className="pressable group flex items-center gap-2 rounded-full bg-[var(--accent)] py-2 pl-3.5 pr-1.5 text-xs font-semibold text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.25)]">
               <span className="hidden sm:inline">New annotation</span>
               <span className="sm:hidden">New</span>
@@ -86,8 +84,8 @@ export function AppShell({ children, compact = false, embedded = false }: { chil
                   </Link>
                 </motion.div>
               ))}
-              <motion.button initial={{ opacity: 0, y: 32 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.24, duration: 0.7, ease: [0.32, 0.72, 0, 1] }} onClick={() => { setMenuOpen(false); setSignInOpen(true); }} className="flex w-full items-center justify-between border-b border-white/12 py-5 text-left text-4xl font-medium tracking-[-0.06em]">
-                Sign in
+              <motion.button initial={{ opacity: 0, y: 32 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.24, duration: 0.7, ease: [0.32, 0.72, 0, 1] }} onClick={() => { setMenuOpen(false); if (user) void signOut(); else openSignIn(); }} className="flex w-full items-center justify-between border-b border-white/12 py-5 text-left text-4xl font-medium tracking-[-0.06em]">
+                {user ? "Sign out" : "Sign in"}
                 <ArrowUpRight size={23} weight="light" />
               </motion.button>
             </nav>
@@ -96,7 +94,6 @@ export function AppShell({ children, compact = false, embedded = false }: { chil
       </AnimatePresence>
 
       <main>{children}</main>
-      {!embedded && <SignInSheet open={signInOpen} onClose={() => setSignInOpen(false)} />}
     </>
   );
 }

@@ -9,6 +9,14 @@ export type Author = {
   bio: string;
 };
 
+export type SessionUser = {
+  id: string;
+  name: string;
+  email: string;
+  picture?: string;
+  provider: "google";
+};
+
 export type Annotation = {
   id: string;
   sourceType: SourceType;
@@ -17,6 +25,8 @@ export type Annotation = {
   sourceTitle: string;
   sourcePublisher: string;
   sourceImage?: string;
+  mediaUrl?: string;
+  mediaContentType?: string;
   excerpt?: string;
   startSeconds?: number;
   endSeconds?: number;
@@ -50,7 +60,10 @@ export type Claim = {
 export type StudioDraft = {
   sourceUrl: string;
   sourceTitle: string;
+  sourcePublisher: string;
+  sourceImage: string;
   sourceType: SourceType;
+  mediaUrl: string;
   selection: string;
   startSeconds: number;
   endSeconds: number;

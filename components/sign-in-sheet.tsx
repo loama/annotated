@@ -1,29 +1,75 @@
 "use client";
 
 import { AnimatePresence, motion } from "framer-motion";
-import { Check, X } from "@phosphor-icons/react";
-import { useEffect, useState } from "react";
+import { Check, ShieldCheck, X } from "@phosphor-icons/react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import type { SessionUser } from "@/lib/types";
 
-type Provider = "google" | "x";
+declare global {
+  interface Window {
+    google?: {
+      accounts: {
+        id: {
+          initialize: (options: { client_id: string; callback: (response: { credential: string }) => void; ux_mode: "popup"; auto_select: boolean }) => void;
+          renderButton: (element: HTMLElement, options: Record<string, string | number>) => void;
+          cancel: () => void;
+        };
+      };
+    };
+  }
+}
 
-export function SignInSheet({ open, onClose }: { open: boolean; onClose: () => void }) {
-  const [provider, setProvider] = useState<Provider | null>(null);
-  const [complete, setComplete] = useState(false);
+export function SignInSheet({ open, onClose, onAuthenticated }: { open: boolean; onClose: () => void; onAuthenticated: (user: SessionUser) => void }) {
+  const buttonRef = useRef<HTMLDivElement>(null);
+  const [status, setStatus] = useState<"idle" | "connecting" | "complete">("idle");
+  const [error, setError] = useState("");
+  const [userName, setUserName] = useState("");
+
+  const mountGoogleButton = useCallback(() => {
+    const clientId = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID;
+    if (!open || !clientId || !buttonRef.current || !window.google) return;
+    buttonRef.current.replaceChildren();
+    window.google.accounts.id.initialize({
+      client_id: clientId,
+      ux_mode: "popup",
+      auto_select: false,
+      callback: async ({ credential }) => {
+        setStatus("connecting");
+        setError("");
+        try {
+          const response = await fetch("/api/auth/session", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ credential }) });
+          const payload = await response.json() as { user?: SessionUser; error?: string };
+          if (!response.ok || !payload.user) throw new Error(payload.error || "Sign-in could not be completed");
+          setUserName(payload.user.name.split(" ")[0]);
+          setStatus("complete");
+          window.setTimeout(() => onAuthenticated(payload.user as SessionUser), 700);
+        } catch (reason) {
+          setStatus("idle");
+          setError(reason instanceof Error ? reason.message : "Sign-in could not be completed");
+        }
+      },
+    });
+    window.google.accounts.id.renderButton(buttonRef.current, { type: "standard", theme: "outline", size: "large", shape: "pill", text: "continue_with", width: 340, logo_alignment: "left" });
+  }, [onAuthenticated, open]);
 
   useEffect(() => {
     if (!open) {
-      setProvider(null);
-      setComplete(false);
+      setStatus("idle");
+      setError("");
+      window.google?.accounts.id.cancel();
+      return;
     }
-  }, [open]);
-
-  function connect(nextProvider: Provider) {
-    setProvider(nextProvider);
-    window.setTimeout(() => {
-      localStorage.setItem("annotated-user", JSON.stringify({ id: "eduardo-lopez", name: "Eduardo López", handle: "@loama" }));
-      setComplete(true);
-    }, 900);
-  }
+    if (window.google) { mountGoogleButton(); return; }
+    const existing = document.getElementById("google-identity-services") as HTMLScriptElement | null;
+    if (existing) { existing.addEventListener("load", mountGoogleButton, { once: true }); return; }
+    const script = document.createElement("script");
+    script.id = "google-identity-services";
+    script.src = "https://accounts.google.com/gsi/client";
+    script.async = true;
+    script.onload = mountGoogleButton;
+    script.onerror = () => setError("Google sign-in could not load. Check your connection and try again.");
+    document.head.appendChild(script);
+  }, [mountGoogleButton, open]);
 
   return (
     <AnimatePresence>
@@ -36,29 +82,23 @@ export function SignInSheet({ open, onClose }: { open: boolean; onClose: () => v
                   <span className="eyebrow">Your reading, connected</span>
                   <h2 id="signin-title" className="mt-5 text-3xl font-medium tracking-[-0.06em]">Come back to the thread.</h2>
                 </div>
-                <button onClick={onClose} aria-label="Close sign in" className="pressable grid size-9 place-items-center rounded-full border border-[var(--line)]">
-                  <X size={17} weight="light" />
-                </button>
+                <button onClick={onClose} aria-label="Close sign in" className="pressable grid size-9 place-items-center rounded-full border border-[var(--line)]"><X size={17} weight="light" /></button>
               </div>
 
-              {complete ? (
+              {status === "complete" ? (
                 <motion.div initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} className="rounded-[1.5rem] bg-[var(--ink)] p-6 text-[var(--paper-bright)]">
                   <span className="mb-5 grid size-10 place-items-center rounded-full bg-[var(--accent)]"><Check size={20} weight="bold" /></span>
-                  <p className="text-xl font-medium tracking-[-0.04em]">You are in, Eduardo.</p>
-                  <p className="mt-2 text-sm leading-relaxed text-white/58">Your annotations, follows, and comments are ready on this device.</p>
-                  <button onClick={onClose} className="pressable mt-7 w-full rounded-full bg-[var(--paper-bright)] py-3 text-sm font-semibold text-[var(--ink)]">Continue</button>
+                  <p className="text-xl font-medium tracking-[-0.04em]">You are in{userName ? `, ${userName}` : ""}.</p>
+                  <p className="mt-2 text-sm leading-relaxed text-white/58">Your identity is verified by Google. Follows, annotations, and comments now travel with your account.</p>
                 </motion.div>
               ) : (
-                <div className="space-y-3">
-                  <button disabled={provider !== null} onClick={() => connect("google")} className="pressable flex w-full items-center justify-between rounded-full border border-[var(--line)] bg-white/45 px-5 py-3.5 text-sm font-semibold disabled:opacity-55">
-                    <span className="flex items-center gap-3"><span className="grid size-7 place-items-center rounded-full border border-[var(--line)] bg-white text-xs font-bold">G</span>Continue with Google</span>
-                    {provider === "google" && <span className="size-3 animate-pulse rounded-full bg-[var(--accent)]" />}
-                  </button>
-                  <button disabled={provider !== null} onClick={() => connect("x")} className="pressable flex w-full items-center justify-between rounded-full bg-[var(--ink)] px-5 py-3.5 text-sm font-semibold text-[var(--paper-bright)] disabled:opacity-55">
-                    <span className="flex items-center gap-3"><span className="grid size-7 place-items-center rounded-full bg-white/10 text-xs font-semibold">X</span>Continue with X</span>
-                    {provider === "x" && <span className="size-3 animate-pulse rounded-full bg-[var(--accent)]" />}
-                  </button>
-                  <p className="px-4 pt-4 text-center text-[0.68rem] leading-relaxed text-[var(--ink-muted)]">No passwords. No inbox clutter. Your source history stays attached to your account.</p>
+                <div>
+                  <div className={`relative min-h-11 overflow-hidden rounded-full transition-opacity ${status === "connecting" ? "pointer-events-none opacity-45" : ""}`}>
+                    <div ref={buttonRef} className="flex min-h-11 justify-center" aria-label="Google sign-in button" />
+                    {status === "connecting" && <div className="absolute inset-0 grid place-items-center bg-[var(--paper-bright)]/85 text-xs font-semibold">Verifying with Google…</div>}
+                  </div>
+                  {error && <p role="alert" className="mt-4 rounded-xl bg-[var(--accent)]/8 px-4 py-3 text-center text-xs text-[var(--accent)]">{error}</p>}
+                  <div className="mt-6 flex items-start gap-3 border-t border-[var(--line)] px-2 pt-5 text-[0.68rem] leading-relaxed text-[var(--ink-muted)]"><ShieldCheck size={17} weight="light" className="mt-0.5 shrink-0" /><p>Google is the only account provider. Annotated never receives your password and requests only your basic profile.</p></div>
                 </div>
               )}
             </div>
