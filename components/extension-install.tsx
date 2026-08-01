@@ -12,7 +12,7 @@ import {
   SidebarSimple,
   Sparkle,
 } from "@phosphor-icons/react";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { AppShell } from "./app-shell";
 
 const steps = [
@@ -33,13 +33,8 @@ const steps = [
   },
 ];
 
-export function ExtensionInstall({ storeUrl }: { storeUrl?: string }) {
+export function ExtensionInstall({ storeUrl, mobileDevice }: { storeUrl?: string; mobileDevice: boolean }) {
   const [copyState, setCopyState] = useState<"idle" | "copied" | "failed">("idle");
-  const [mobileDevice, setMobileDevice] = useState(false);
-
-  useEffect(() => {
-    setMobileDevice(/Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent));
-  }, []);
 
   async function copyExtensionsAddress() {
     try {
