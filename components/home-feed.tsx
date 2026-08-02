@@ -11,12 +11,15 @@ import {
   Heart,
   LinkSimple,
   Play,
+  Rows,
   SidebarSimple,
+  SquaresFour,
   Sparkle,
 } from "@phosphor-icons/react";
 import { useEffect, useMemo, useState } from "react";
 import type { Annotation, SourceType } from "@/lib/types";
 import { seedAnnotations } from "@/lib/data";
+import { buildFeedLayout, type FeedCardLayout } from "@/lib/feed-layout";
 import { AppShell } from "./app-shell";
 import { MediaPreview } from "./media-preview";
 
@@ -28,6 +31,15 @@ const filters: Array<{ label: string; value: "all" | SourceType }> = [
 ];
 
 const spring = { type: "spring" as const, stiffness: 120, damping: 22 };
+type FeedView = "grid" | "stream";
+
+const spanClasses: Record<FeedCardLayout["span"], string> = {
+  4: "md:col-span-4",
+  5: "md:col-span-5",
+  6: "md:col-span-6",
+  7: "md:col-span-7",
+  8: "md:col-span-8",
+};
 
 function timeAgo(dateString: string) {
   const hours = Math.floor((Date.now() - new Date(dateString).getTime()) / 3_600_000);
@@ -36,31 +48,35 @@ function timeAgo(dateString: string) {
   return `${Math.floor(hours / 24)}d ago`;
 }
 
-function FeedCard({ annotation, index }: { annotation: Annotation; index: number }) {
+function FeedCard({ annotation, index, cardLayout, view }: { annotation: Annotation; index: number; cardLayout: FeedCardLayout; view: FeedView }) {
   const [applauded, setApplauded] = useState(false);
+  const compact = view === "grid" && cardLayout.density === "compact";
+  const cardClass = view === "stream"
+    ? "w-full"
+    : `${spanClasses[cardLayout.span]} ${cardLayout.centered ? "md:col-start-3" : ""}`;
 
   return (
-    <motion.article layout initial={{ opacity: 0, y: 34 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 20 }} transition={{ ...spring, delay: index * 0.055 }} className={`paper-shell ${index % 3 === 0 ? "md:col-span-7" : index % 3 === 1 ? "md:col-span-5" : "md:col-span-6"}`}>
-      <div className="paper-core flex h-full flex-col p-3.5 md:p-4">
+    <motion.article layout initial={{ opacity: 0, y: 34 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 20 }} transition={{ ...spring, delay: index * 0.045 }} className={`paper-shell ${cardClass}`}>
+      <div className={`paper-core flex h-full flex-col ${compact ? "p-3" : "p-3.5 md:p-4"}`}>
         <Link href={`/annotation/${annotation.id}`} className="block">
-          <MediaPreview annotation={annotation} />
+          <MediaPreview annotation={annotation} compact={compact} />
         </Link>
-        <div className="flex flex-1 flex-col px-2 pb-2 pt-5 md:px-3">
-          <div className="mb-5 flex items-center justify-between gap-4">
+        <div className={`flex flex-1 flex-col px-2 pb-2 md:px-3 ${compact ? "pt-4" : "pt-5"}`}>
+          <div className={`flex items-center justify-between gap-3 ${compact ? "mb-4" : "mb-5"}`}>
             <Link href={`/annotation/${annotation.id}`} className="group flex min-w-0 items-center gap-2.5">
-              <span className="grid size-8 shrink-0 place-items-center rounded-full text-[0.65rem] font-semibold text-white" style={{ background: annotation.author.accent }}>{annotation.author.initials}</span>
+              <span className={`grid shrink-0 place-items-center rounded-full font-semibold text-white ${compact ? "size-7 text-[0.58rem]" : "size-8 text-[0.65rem]"}`} style={{ background: annotation.author.accent }}>{annotation.author.initials}</span>
               <span className="min-w-0">
                 <span className="block truncate text-xs font-semibold">{annotation.author.name}</span>
                 <span className="block font-mono text-[0.56rem] text-[var(--ink-muted)]">{timeAgo(annotation.createdAt)}</span>
               </span>
             </Link>
-            <span className="truncate rounded-full bg-[var(--paper-deep)] px-2.5 py-1 font-mono text-[0.55rem] uppercase tracking-[0.1em] text-[var(--ink-muted)]">{annotation.sourceDomain}</span>
+            <span className={`max-w-[45%] truncate rounded-full bg-[var(--paper-deep)] py-1 font-mono uppercase tracking-[0.1em] text-[var(--ink-muted)] ${compact ? "px-2 text-[0.48rem]" : "px-2.5 text-[0.55rem]"}`}>{annotation.sourceDomain}</span>
           </div>
           <Link href={`/annotation/${annotation.id}`} className="group flex-1">
-            <h2 className="text-xl font-medium leading-[1.08] tracking-[-0.045em] transition-colors duration-500 group-hover:text-[var(--accent)] md:text-2xl">{annotation.sourceTitle}</h2>
-            <p className="mt-3 line-clamp-3 text-[0.84rem] leading-relaxed text-[var(--ink-muted)]">{annotation.commentary}</p>
+            <h2 className={`font-medium leading-[1.08] tracking-[-0.045em] transition-colors duration-500 group-hover:text-[var(--accent)] ${compact ? "text-lg md:text-xl" : "text-xl md:text-2xl"}`}>{annotation.sourceTitle}</h2>
+            <p className={`mt-3 text-[0.84rem] leading-relaxed text-[var(--ink-muted)] ${compact ? "line-clamp-2" : "line-clamp-3"}`}>{annotation.commentary}</p>
           </Link>
-          <div className="mt-6 flex items-center justify-between border-t border-[var(--line)] pt-4">
+          <div className={`flex items-center justify-between border-t border-[var(--line)] pt-4 ${compact ? "mt-5" : "mt-6"}`}>
             <div className="flex items-center gap-4 text-[var(--ink-muted)]">
               <button onClick={() => setApplauded((value) => !value)} className={`pressable flex items-center gap-1.5 text-xs ${applauded ? "text-[var(--accent)]" : "hover:text-[var(--ink)]"}`} aria-label={`${applauded ? "Remove applause" : "Applaud annotation"}, ${annotation.applause + (applauded ? 1 : 0)} applause`}>
                 <Heart size={16} weight={applauded ? "fill" : "light"} />
@@ -81,11 +97,12 @@ function FeedCard({ annotation, index }: { annotation: Annotation; index: number
   );
 }
 
-function FeedSkeleton() {
+function FeedSkeleton({ view }: { view: FeedView }) {
+  const layout = buildFeedLayout(4);
   return (
-    <div className="grid grid-cols-1 gap-4 md:grid-cols-12">
-      {["md:col-span-7", "md:col-span-5", "md:col-span-6", "md:col-span-6"].map((spanClass, index) => (
-        <div key={index} className={`paper-shell animate-pulse ${spanClass}`}>
+    <div className={view === "grid" ? "grid grid-cols-1 gap-4 md:grid-cols-12" : "mx-auto flex max-w-[46rem] flex-col gap-4"}>
+      {layout.map((item, index) => (
+        <div key={index} className={`paper-shell animate-pulse ${view === "grid" ? spanClasses[item.span] : "w-full"}`}>
           <div className="paper-core p-4">
             <div className="aspect-[16/9] rounded-[1.55rem] bg-[var(--paper-deep)]" />
             <div className="space-y-3 p-3 pt-6">
@@ -103,6 +120,7 @@ function FeedSkeleton() {
 export function HomeFeed() {
   const [annotations, setAnnotations] = useState<Annotation[]>(seedAnnotations);
   const [filter, setFilter] = useState<"all" | SourceType>("all");
+  const [view, setView] = useState<FeedView>("grid");
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -115,11 +133,22 @@ export function HomeFeed() {
     return () => { active = false; };
   }, []);
 
+  useEffect(() => {
+    const stored = window.localStorage.getItem("annotated:feed-view");
+    if (stored === "grid" || stored === "stream") setView(stored);
+  }, []);
+
   const visible = useMemo(() => filter === "all" ? annotations : annotations.filter((annotation) => annotation.sourceType === filter), [annotations, filter]);
+  const cardLayout = useMemo(() => buildFeedLayout(visible.length), [visible.length]);
+
+  function chooseView(nextView: FeedView) {
+    setView(nextView);
+    window.localStorage.setItem("annotated:feed-view", nextView);
+  }
 
   return (
     <AppShell>
-      <section className="mx-auto grid min-h-[100dvh] max-w-[1400px] grid-cols-1 items-end gap-10 px-4 pb-12 pt-32 md:grid-cols-12 md:px-7 md:pb-16 md:pt-40">
+      <section className="mx-auto grid max-w-[1400px] grid-cols-1 items-end gap-10 px-4 pb-16 pt-28 md:grid-cols-12 md:px-7 md:pb-20 md:pt-32">
         <div className="md:col-span-8">
           <span className="eyebrow">A source-first public notebook</span>
           <h1 className="display mt-7 max-w-[11ch] text-balance">
@@ -182,21 +211,35 @@ export function HomeFeed() {
             <span className="eyebrow">The public margin</span>
             <h2 className="display-small mt-6 max-w-[10ch]">What people kept.</h2>
           </div>
-          <div className="flex overflow-x-auto pb-2 no-scrollbar md:col-span-5 md:justify-end">
-            <div className="flex rounded-full border border-[var(--line)] bg-[var(--paper-bright)] p-1">
+          <div className="flex flex-col items-start gap-3 md:col-span-5 md:items-end">
+            <div className="flex max-w-full overflow-x-auto pb-1 no-scrollbar">
+              <div className="flex rounded-full border border-[var(--line)] bg-[var(--paper-bright)] p-1">
               {filters.map((item) => (
                 <button key={item.value} onClick={() => setFilter(item.value)} className={`relative shrink-0 rounded-full px-3.5 py-2 text-xs font-medium transition-colors duration-500 ${filter === item.value ? "text-white" : "text-[var(--ink-muted)] hover:text-[var(--ink)]"}`}>
                   {filter === item.value && <motion.span layoutId="feed-filter" className="absolute inset-0 rounded-full bg-[var(--ink)]" transition={spring} />}
                   <span className="relative">{item.label}</span>
                 </button>
               ))}
+              </div>
+            </div>
+            <div className="flex items-center rounded-full border border-[var(--line)] bg-[var(--paper-bright)] p-1" role="group" aria-label="Feed layout">
+              {([
+                { value: "grid" as const, label: "Grid", icon: SquaresFour },
+                { value: "stream" as const, label: "Stream", icon: Rows },
+              ]).map((item) => (
+                <button key={item.value} type="button" onClick={() => chooseView(item.value)} aria-pressed={view === item.value} className={`relative flex items-center gap-1.5 rounded-full px-3 py-2 text-xs font-medium transition-colors duration-500 ${view === item.value ? "text-white" : "text-[var(--ink-muted)] hover:text-[var(--ink)]"}`}>
+                  {view === item.value && <motion.span layoutId="feed-view" className="absolute inset-0 rounded-full bg-[var(--ink)]" transition={spring} />}
+                  <item.icon size={14} weight="light" className="relative" />
+                  <span className="relative">{item.label}</span>
+                </button>
+              ))}
             </div>
           </div>
         </div>
-        {loading ? <FeedSkeleton /> : visible.length ? (
-          <motion.div layout className="grid grid-cols-1 gap-4 md:grid-cols-12">
+        {loading ? <FeedSkeleton view={view} /> : visible.length ? (
+          <motion.div layout className={view === "grid" ? "grid grid-flow-row-dense grid-cols-1 gap-4 md:grid-cols-12" : "mx-auto flex max-w-[46rem] flex-col gap-4"}>
             <AnimatePresence mode="popLayout">
-              {visible.map((annotation, index) => <FeedCard key={annotation.id} annotation={annotation} index={index} />)}
+              {visible.map((annotation, index) => <FeedCard key={annotation.id} annotation={annotation} index={index} cardLayout={cardLayout[index]} view={view} />)}
             </AnimatePresence>
           </motion.div>
         ) : (

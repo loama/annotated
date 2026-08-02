@@ -10,7 +10,7 @@ function formatTime(seconds = 0) {
   return `${minutes}:${String(seconds % 60).padStart(2, "0")}`;
 }
 
-export function MediaPreview({ annotation, interactive = false }: { annotation: Annotation; interactive?: boolean }) {
+export function MediaPreview({ annotation, interactive = false, compact = false }: { annotation: Annotation; interactive?: boolean; compact?: boolean }) {
   const videoId = youtubeId(annotation.sourceUrl);
   const embedUrl = youtubeEmbedUrl(annotation.sourceUrl, annotation.startSeconds || 0, annotation.endSeconds || 90);
   const duration = clipDuration(annotation.startSeconds || 0, annotation.endSeconds || 0);
@@ -57,7 +57,7 @@ export function MediaPreview({ annotation, interactive = false }: { annotation: 
 
   if (annotation.sourceType === "podcast") {
     return (
-      <div className="relative flex aspect-[16/8] flex-col justify-between overflow-hidden rounded-[1.55rem] bg-[#20211f] p-5 text-[var(--paper-bright)] source-pattern">
+      <div className={`relative flex flex-col justify-between overflow-hidden rounded-[1.55rem] bg-[#20211f] text-[var(--paper-bright)] source-pattern ${interactive ? "min-h-72 p-5" : `aspect-[16/10] ${compact ? "p-4" : "p-5"}`}`}>
         <div className="flex items-center justify-between">
           <span className="grid size-11 place-items-center rounded-full bg-white/9"><Headphones size={19} weight="light" /></span>
           <span className="font-mono text-[0.58rem] uppercase tracking-[0.14em] text-white/48">90s audio excerpt</span>
@@ -77,14 +77,14 @@ export function MediaPreview({ annotation, interactive = false }: { annotation: 
   }
 
   return (
-    <div className="relative overflow-hidden rounded-[1.55rem] bg-[#ddd5c8] p-6 md:p-8">
+    <div className={`relative overflow-hidden rounded-[1.55rem] bg-[#ddd5c8] ${interactive ? "p-6 md:p-8" : `flex aspect-[16/10] items-center ${compact ? "p-5" : "p-6 md:p-8"}`}`}>
       {annotation.sourceImage && <img src={annotation.sourceImage} alt="" loading="lazy" decoding="async" className="absolute inset-0 size-full object-cover opacity-15 mix-blend-multiply" />}
       <div className="relative">
-        <div className="mb-8 flex items-center justify-between">
+        <div className={`${compact ? "mb-5" : "mb-8"} flex items-center justify-between`}>
           <span className="grid size-10 place-items-center rounded-full bg-[var(--paper-bright)]"><Article size={18} weight="light" /></span>
           <span className="font-mono text-[0.58rem] uppercase tracking-[0.14em] text-[var(--ink-muted)]">Highlighted passage</span>
         </div>
-        <blockquote className="max-w-[39ch] text-xl font-medium leading-[1.25] tracking-[-0.04em] md:text-2xl">“{annotation.excerpt}”</blockquote>
+        <blockquote className={`max-w-[39ch] font-medium leading-[1.25] tracking-[-0.04em] ${compact ? "line-clamp-4 text-lg" : "line-clamp-5 text-xl md:text-2xl"}`}>“{annotation.excerpt}”</blockquote>
       </div>
     </div>
   );
