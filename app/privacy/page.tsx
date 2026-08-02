@@ -9,9 +9,9 @@ export const metadata: Metadata = {
 
 export default function PrivacyPage() {
   return (
-    <main className="mx-auto min-h-[100dvh] max-w-4xl px-4 pb-24 pt-12 md:px-7 md:pb-32 md:pt-20">
+    <main className="mx-auto min-h-[100dvh] max-w-4xl px-4 pb-24 pt-6 md:px-7 md:pb-32 md:pt-8">
       <Link href="/extension" className="pressable inline-flex items-center gap-2 text-sm font-semibold"><ArrowLeft size={16} weight="light" />Back to installation</Link>
-      <header className="border-b border-[var(--line)] pb-14 pt-20 md:pb-20 md:pt-28">
+      <header className="border-b border-[var(--line)] pb-14 pt-16 md:pb-20 md:pt-20">
         <span className="eyebrow">Privacy</span>
         <h1 className="display-small mt-7 max-w-[10ch]">Read closely. Collect lightly.</h1>
         <p className="mt-7 max-w-[58ch] text-base leading-relaxed text-[var(--ink-muted)]">Annotated collects only what it needs to create source-linked annotations and social interactions you explicitly choose.</p>

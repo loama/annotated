@@ -457,7 +457,7 @@ export function Studio() {
 
   return (
     <AppShell compact={fromExtension} embedded={fromExtension}>
-      <div className={`mx-auto min-h-[100dvh] max-w-[1400px] px-4 pb-12 md:px-7 md:pb-16 ${fromExtension ? "pt-5 md:pt-7" : "pt-28 md:pt-32"}`}>
+      <div className={`mx-auto min-h-[100dvh] max-w-[1400px] px-4 pb-12 md:px-7 md:pb-16 ${fromExtension ? "pt-5 md:pt-7" : "pt-24 md:pt-28"}`}>
         <div className="mb-7 flex flex-wrap items-center justify-between gap-4">
           <div className="flex items-center gap-3">
             {fromExtension && <span className="flex items-center gap-2 rounded-full bg-[var(--paper-deep)] px-3 py-1.5 font-mono text-[0.55rem] uppercase tracking-[0.12em]"><SidebarSimple size={13} weight="light" />Current tab captured</span>}

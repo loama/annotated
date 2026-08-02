@@ -124,7 +124,7 @@ function AnnotationContent({ annotationId }: { annotationId: string }) {
 
   return (
     <AppShell compact>
-      <div className="mx-auto max-w-[1400px] px-4 pb-24 pt-28 md:px-7 md:pt-36">
+      <div className="mx-auto max-w-[1400px] px-4 pb-24 pt-24 md:px-7 md:pt-28">
         <div className="mb-8 flex items-center justify-between">
           <Link href="/" className="pressable flex items-center gap-2 text-xs font-semibold text-[var(--ink-muted)] hover:text-[var(--ink)]"><ArrowLeft size={15} weight="light" />Back to the feed</Link>
           <div className="flex items-center gap-2">
@@ -186,7 +186,7 @@ function AnnotationContent({ annotationId }: { annotationId: string }) {
 }
 
 function AnnotationLoading() {
-  return <AppShell compact><div className="mx-auto min-h-[100dvh] max-w-[1400px] animate-pulse px-4 pb-20 pt-32 md:px-7"><div className="paper-shell"><div className="paper-core p-4"><div className="aspect-video rounded-[1.5rem] bg-[var(--paper-deep)]" /><div className="space-y-4 p-8"><div className="h-3 w-1/4 rounded-full bg-[var(--paper-deep)]" /><div className="h-12 w-3/4 rounded-xl bg-[var(--paper-deep)]" /><div className="h-4 w-full rounded-full bg-[var(--paper-deep)]" /><div className="h-4 w-4/5 rounded-full bg-[var(--paper-deep)]" /></div></div></div></div></AppShell>;
+  return <AppShell compact><div className="mx-auto min-h-[100dvh] max-w-[1400px] animate-pulse px-4 pb-20 pt-24 md:px-7 md:pt-28"><div className="paper-shell"><div className="paper-core p-4"><div className="aspect-video rounded-[1.5rem] bg-[var(--paper-deep)]" /><div className="space-y-4 p-8"><div className="h-3 w-1/4 rounded-full bg-[var(--paper-deep)]" /><div className="h-12 w-3/4 rounded-xl bg-[var(--paper-deep)]" /><div className="h-4 w-full rounded-full bg-[var(--paper-deep)]" /><div className="h-4 w-4/5 rounded-full bg-[var(--paper-deep)]" /></div></div></div></div></AppShell>;
 }
 
 function AnnotationMissing() {

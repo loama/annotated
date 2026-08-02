@@ -49,7 +49,7 @@ export function ExtensionInstall({ storeUrl, mobileDevice }: { storeUrl?: string
 
   return (
     <AppShell>
-      <section className="mx-auto grid min-h-[88dvh] max-w-[1400px] grid-cols-1 items-end gap-12 px-4 pb-16 pt-32 md:grid-cols-12 md:px-7 md:pb-24 md:pt-40">
+      <section className="mx-auto grid max-w-[1400px] grid-cols-1 items-end gap-12 px-4 pb-16 pt-28 md:grid-cols-12 md:px-7 md:pb-20 md:pt-32">
         <div className="md:col-span-7">
           <span className="eyebrow">Annotated for Chrome</span>
           <h1 className="display mt-7 max-w-[9ch] text-balance">Your margin, beside the page.</h1>
